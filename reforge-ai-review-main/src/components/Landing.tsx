@@ -434,7 +434,7 @@ export default function Landing() {
             <span className="text-sm text-muted-foreground ml-2">© {new Date().getFullYear()}</span>
           </div>
           <div className="flex items-center gap-5 text-sm">
-            <a href="https://github.com" target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition">
+            <a href="https://github.com/BharathWaj-K-R/Re_Forge" target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition">
               <Github className="w-4 h-4" /> GitHub
             </a>
             <a href={API_URL || "#"} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition">

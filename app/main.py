@@ -19,6 +19,7 @@ origins = [
     "http://localhost:3000",
     "https://reforge-client.onrender.com",
     os.getenv("FRONTEND_URL", ""),
+    os.getenv("NEW_FRONTEND_URL", ""),
 ]
 
 app.add_middleware(

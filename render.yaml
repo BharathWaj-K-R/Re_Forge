@@ -9,6 +9,8 @@ services:
         sync: false
       - key: FRONTEND_URL
         sync: false
+      - key: NEW_FRONTEND_URL
+        sync: false
       - key: AGENT_MODE
         sync: false
       - key: AGENT_TIMEOUT_SECONDS

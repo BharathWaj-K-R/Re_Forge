@@ -38,10 +38,7 @@ export default function AuthPage() {
       <nav className="fixed top-0 inset-x-0 z-50 glass">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
-            <div
-              className="w-8 h-8 rounded-lg"
-              style={{ background: "var(--gradient-brand)", boxShadow: "var(--shadow-glow)" }}
-            />
+            <img src="/logo.png" alt="ReForge" className="w-8 h-8 rounded-lg object-contain" />
             <span className="font-display font-semibold text-lg">ReForge</span>
           </Link>
           <Link to="/" className="text-sm text-muted-foreground hover:text-foreground transition inline-flex items-center gap-1.5">

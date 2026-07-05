@@ -213,7 +213,7 @@ export default function Landing() {
       <nav className="fixed top-0 inset-x-0 z-50 glass">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <a href="#top" className="flex items-center gap-2">
-            <img src="/logo.png" alt="ReForge" className="w-8 h-8 rounded-lg object-contain" />
+            <img src="/reforgelogo.png" alt="ReForge" className="w-8 h-8 rounded-lg object-contain" />
             <span className="font-display font-semibold text-lg">ReForge</span>
           </a>
           <div className="hidden md:flex items-center gap-8 text-sm text-muted-foreground">
@@ -429,7 +429,7 @@ export default function Landing() {
       <footer className="border-t px-6 py-10">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <img src="/logo.png" alt="ReForge" className="w-6 h-6 rounded-md object-contain" />
+            <img src="/reforgelogo.png" alt="ReForge" className="w-6 h-6 rounded-md object-contain" />
             <span className="font-display font-semibold">ReForge</span>
             <span className="text-sm text-muted-foreground ml-2">© {new Date().getFullYear()}</span>
           </div>

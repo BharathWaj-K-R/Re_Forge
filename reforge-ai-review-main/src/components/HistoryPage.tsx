@@ -77,7 +77,7 @@ export default function HistoryPage() {
       <nav className="fixed top-0 inset-x-0 z-50 glass">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
-            <img src="/logo.png" alt="ReForge" className="w-8 h-8 rounded-lg object-contain" />
+            <img src="/reforgelogo.png" alt="ReForge" className="w-8 h-8 rounded-lg object-contain" />
             <span className="font-display font-semibold text-lg">ReForge</span>
           </Link>
           <div className="flex items-center gap-4">

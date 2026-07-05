@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bug, Shield, Zap, Sparkles, Loader2, Play, Github, ChevronDown, Server, CheckCircle2, LogIn, History } from "lucide-react";
+import { Bug, Shield, Zap, Sparkles, Loader2, Play, Github, ChevronDown, Server, CheckCircle2, LogIn, History, Code2 } from "lucide-react";
 import HeroOrb from "./HeroOrb";
 import MiniCards from "./MiniCards";
 import { useAuth } from "../contexts/AuthContext";
@@ -223,15 +223,24 @@ export default function Landing() {
           </div>
           <div className="flex items-center gap-3">
             {isAuthenticated ? (
-              <button onClick={() => navigate("/history")} className="px-4 py-2 rounded-lg text-sm font-medium border bg-card hover:bg-muted transition inline-flex items-center gap-1.5">
-                <History className="w-4 h-4" /> History
-              </button>
+              <>
+                <button onClick={() => navigate("/dashboard")} className="px-4 py-2 rounded-lg text-sm font-medium border bg-card hover:bg-muted transition inline-flex items-center gap-1.5">
+                  <Code2 className="w-4 h-4" /> Dashboard
+                </button>
+                <button onClick={() => navigate("/history")} className="px-4 py-2 rounded-lg text-sm font-medium border bg-card hover:bg-muted transition inline-flex items-center gap-1.5">
+                  <History className="w-4 h-4" /> History
+                </button>
+              </>
             ) : (
               <button onClick={() => navigate("/auth")} className="px-4 py-2 rounded-lg text-sm font-medium border bg-card hover:bg-muted transition inline-flex items-center gap-1.5">
                 <LogIn className="w-4 h-4" /> Sign in
               </button>
             )}
-            <a href="#demo" className="btn-primary px-4 py-2 rounded-lg text-sm font-medium">Try it</a>
+            {isAuthenticated ? (
+              <button onClick={() => navigate("/dashboard")} className="btn-primary px-4 py-2 rounded-lg text-sm font-medium">Start review</button>
+            ) : (
+              <a href="#demo" className="btn-primary px-4 py-2 rounded-lg text-sm font-medium">Try it</a>
+            )}
           </div>
         </div>
       </nav>

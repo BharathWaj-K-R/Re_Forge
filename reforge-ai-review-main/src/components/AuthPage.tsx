@@ -28,7 +28,7 @@ export default function AuthPage() {
     if (err) {
       setError(err);
     } else {
-      navigate("/history");
+      navigate("/dashboard");
     }
   }
 

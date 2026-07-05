@@ -140,3 +140,41 @@ def get_review_detail(
             "created_at": review_record.created_at.isoformat() if review_record.created_at else None,
         },
     }
+
+
+@router.delete("/history")
+def clear_history(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Delete all review history for the authenticated user."""
+    from app.auth import require_user
+    user = require_user(current_user)
+
+    deleted = db.query(Review).filter(Review.user_id == user.id).delete()
+    db.commit()
+
+    return {
+        "success": True,
+        "message": f"Deleted {deleted} review(s)",
+    }
+
+
+@router.delete("/account")
+def delete_account(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Delete the authenticated user's account and all their data."""
+    from app.auth import require_user
+    user = require_user(current_user)
+
+    # Delete all reviews first (cascade should handle this, but be explicit)
+    db.query(Review).filter(Review.user_id == user.id).delete()
+    db.delete(user)
+    db.commit()
+
+    return {
+        "success": True,
+        "message": "Account deleted successfully",
+    }

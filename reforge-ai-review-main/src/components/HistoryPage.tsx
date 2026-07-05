@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Loader2, Clock, Code2, ChevronRight, LogOut, ArrowLeft, FileText } from "lucide-react";
+import { Loader2, Clock, Code2, ChevronRight, LogOut, ArrowLeft, FileText, Trash2, AlertTriangle, UserX } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, "");
@@ -14,12 +14,15 @@ type HistoryItem = {
 };
 
 export default function HistoryPage() {
-  const { user, token, logout } = useAuth();
+  const { user, token, logout, deleteAccount, clearHistory } = useAuth();
   const navigate = useNavigate();
   const [reviews, setReviews] = useState<HistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedReview, setSelectedReview] = useState<any>(null);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
 
   useEffect(() => {
     if (!token) {
@@ -65,6 +68,29 @@ export default function HistoryPage() {
     navigate("/");
   }
 
+  async function handleClearHistory() {
+    setActionLoading(true);
+    const err = await clearHistory();
+    setActionLoading(false);
+    if (err) {
+      setError(err);
+    } else {
+      setReviews([]);
+      setShowClearConfirm(false);
+    }
+  }
+
+  async function handleDeleteAccount() {
+    setActionLoading(true);
+    const err = await deleteAccount();
+    setActionLoading(false);
+    if (err) {
+      setError(err);
+    } else {
+      navigate("/");
+    }
+  }
+
   function scoreColor(score: number) {
     if (score >= 80) return "var(--success)";
     if (score >= 60) return "var(--warning)";
@@ -81,6 +107,12 @@ export default function HistoryPage() {
             <span className="font-display font-semibold text-lg">ReForge</span>
           </Link>
           <div className="flex items-center gap-4">
+            <button onClick={() => setShowClearConfirm(true)} className="text-sm text-muted-foreground hover:text-foreground transition inline-flex items-center gap-1.5">
+              <Trash2 className="w-4 h-4" /> Clear
+            </button>
+            <button onClick={() => setShowDeleteConfirm(true)} className="text-sm text-muted-foreground hover:text-danger transition inline-flex items-center gap-1.5">
+              <UserX className="w-4 h-4" /> Delete
+            </button>
             <span className="text-sm text-muted-foreground hidden sm:inline">
               {user?.email}
             </span>
@@ -105,7 +137,7 @@ export default function HistoryPage() {
                 {reviews.length} review{reviews.length !== 1 ? "s" : ""} saved
               </p>
             </div>
-            <Link to="/" className="btn-primary px-4 py-2 rounded-lg text-sm font-medium inline-flex items-center gap-2">
+            <Link to="/dashboard" className="btn-primary px-4 py-2 rounded-lg text-sm font-medium inline-flex items-center gap-2">
               <Code2 className="w-4 h-4" /> New Review
             </Link>
           </div>
@@ -138,7 +170,7 @@ export default function HistoryPage() {
               <p className="text-sm text-muted-foreground mb-5">
                 Run your first code review and it will appear here.
               </p>
-              <Link to="/" className="btn-primary px-5 py-2.5 rounded-lg text-sm font-medium inline-flex items-center gap-2">
+              <Link to="/dashboard" className="btn-primary px-5 py-2.5 rounded-lg text-sm font-medium inline-flex items-center gap-2">
                 <Code2 className="w-4 h-4" /> Run a review
               </Link>
             </div>
@@ -272,6 +304,66 @@ export default function HistoryPage() {
                     })}
                   </div>
                 )}
+              </div>
+            </div>
+          )}
+
+          {/* Clear history confirmation */}
+          {showClearConfirm && (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center p-6"
+              style={{ background: "oklch(0 0 0 / 0.4)", backdropFilter: "blur(4px)" }}
+              onClick={() => setShowClearConfirm(false)}
+            >
+              <div
+                className="w-full max-w-sm rounded-2xl border bg-card p-6 shadow-[var(--shadow-elegant)] animate-fade-up"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "oklch(0.95 0.05 25)" }}>
+                    <AlertTriangle className="w-5 h-5 text-danger" />
+                  </div>
+                  <h3 className="font-display font-semibold">Clear all history?</h3>
+                </div>
+                <p className="text-sm text-muted-foreground mb-5">This will permanently delete all {reviews.length} review(s). This action cannot be undone.</p>
+                <div className="flex gap-3">
+                  <button onClick={() => setShowClearConfirm(false)} className="flex-1 px-4 py-2.5 rounded-lg border bg-card hover:bg-muted transition text-sm font-medium">
+                    Cancel
+                  </button>
+                  <button onClick={handleClearHistory} disabled={actionLoading} className="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium text-white inline-flex items-center justify-center gap-2 disabled:opacity-60" style={{ background: "var(--danger)" }}>
+                    {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />} Clear all
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Delete account confirmation */}
+          {showDeleteConfirm && (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center p-6"
+              style={{ background: "oklch(0 0 0 / 0.4)", backdropFilter: "blur(4px)" }}
+              onClick={() => setShowDeleteConfirm(false)}
+            >
+              <div
+                className="w-full max-w-sm rounded-2xl border bg-card p-6 shadow-[var(--shadow-elegant)] animate-fade-up"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "oklch(0.95 0.05 25)" }}>
+                    <UserX className="w-5 h-5 text-danger" />
+                  </div>
+                  <h3 className="font-display font-semibold">Delete account?</h3>
+                </div>
+                <p className="text-sm text-muted-foreground mb-5">This will permanently delete your account and all associated data including review history. This action cannot be undone.</p>
+                <div className="flex gap-3">
+                  <button onClick={() => setShowDeleteConfirm(false)} className="flex-1 px-4 py-2.5 rounded-lg border bg-card hover:bg-muted transition text-sm font-medium">
+                    Cancel
+                  </button>
+                  <button onClick={handleDeleteAccount} disabled={actionLoading} className="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium text-white inline-flex items-center justify-center gap-2 disabled:opacity-60" style={{ background: "var(--danger)" }}>
+                    {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserX className="w-4 h-4" />} Delete
+                  </button>
+                </div>
               </div>
             </div>
           )}

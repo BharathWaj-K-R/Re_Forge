@@ -10,6 +10,8 @@ type AuthContextType = {
   login: (email: string, password: string) => Promise<string | null>;
   register: (email: string, password: string, name: string) => Promise<string | null>;
   logout: () => void;
+  deleteAccount: () => Promise<string | null>;
+  clearHistory: () => Promise<string | null>;
   isAuthenticated: boolean;
 };
 
@@ -85,8 +87,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  async function deleteAccount(): Promise<string | null> {
+    if (!token) return "Not authenticated";
+    try {
+      const res = await fetch(`${API_URL}/account`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        return err.detail || `Failed to delete account (${res.status})`;
+      }
+      logout();
+      return null;
+    } catch (e: any) {
+      return e.message || "Failed to delete account";
+    }
+  }
+
+  async function clearHistory(): Promise<string | null> {
+    if (!token) return "Not authenticated";
+    try {
+      const res = await fetch(`${API_URL}/history`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        return err.detail || `Failed to clear history (${res.status})`;
+      }
+      return null;
+    } catch (e: any) {
+      return e.message || "Failed to clear history";
+    }
+  }
+
   return (
-    <AuthContext.Provider value={{ user, token, login, register, logout, isAuthenticated: !!token }}>
+    <AuthContext.Provider value={{ user, token, login, register, logout, deleteAccount, clearHistory, isAuthenticated: !!token }}>
       {children}
     </AuthContext.Provider>
   );

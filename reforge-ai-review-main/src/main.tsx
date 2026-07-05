@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import Landing from "./components/Landing";
 import AuthPage from "./components/AuthPage";
+import DashboardPage from "./components/DashboardPage";
 import HistoryPage from "./components/HistoryPage";
 import "./styles.css";
 
@@ -19,6 +20,7 @@ createRoot(rootElement).render(
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/auth" element={<AuthPage />} />
+          <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/history" element={<HistoryPage />} />
         </Routes>
       </BrowserRouter>

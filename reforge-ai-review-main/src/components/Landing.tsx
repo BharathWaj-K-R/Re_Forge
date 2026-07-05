@@ -1,7 +1,9 @@
 import { useMemo, useState } from "react";
-import { Bug, Shield, Zap, Sparkles, Loader2, Play, Github, ChevronDown, Server, CheckCircle2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Bug, Shield, Zap, Sparkles, Loader2, Play, Github, ChevronDown, Server, CheckCircle2, LogIn, History } from "lucide-react";
 import HeroOrb from "./HeroOrb";
 import MiniCards from "./MiniCards";
+import { useAuth } from "../contexts/AuthContext";
 
 const LANGS = ["javascript", "typescript", "python", "go", "rust", "java", "cpp"];
 
@@ -166,6 +168,8 @@ function CategoryCard({ icon: Icon, label, cat, tint }: { icon: any; label: stri
 }
 
 export default function Landing() {
+  const navigate = useNavigate();
+  const { isAuthenticated, token } = useAuth();
   const [code, setCode] = useState(SAMPLE);
   const [lang, setLang] = useState("javascript");
   const [loading, setLoading] = useState(false);
@@ -178,9 +182,11 @@ export default function Landing() {
     setLoading(true); setError(null);
     try {
       if (API_URL) {
+        const headers: Record<string, string> = { "Content-Type": "application/json" };
+        if (token) headers["Authorization"] = `Bearer ${token}`;
         const res = await fetch(`${API_URL.replace(/\/$/, "")}/review`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers,
           body: JSON.stringify({ code, language: lang }),
         });
         if (!res.ok) throw new Error(`API ${res.status}`);
@@ -215,7 +221,18 @@ export default function Landing() {
             <a href="#features" className="hover:text-foreground transition">Features</a>
             <a href="#how" className="hover:text-foreground transition">How it works</a>
           </div>
-          <a href="#demo" className="btn-primary px-4 py-2 rounded-lg text-sm font-medium">Try it</a>
+          <div className="flex items-center gap-3">
+            {isAuthenticated ? (
+              <button onClick={() => navigate("/history")} className="px-4 py-2 rounded-lg text-sm font-medium border bg-card hover:bg-muted transition inline-flex items-center gap-1.5">
+                <History className="w-4 h-4" /> History
+              </button>
+            ) : (
+              <button onClick={() => navigate("/auth")} className="px-4 py-2 rounded-lg text-sm font-medium border bg-card hover:bg-muted transition inline-flex items-center gap-1.5">
+                <LogIn className="w-4 h-4" /> Sign in
+              </button>
+            )}
+            <a href="#demo" className="btn-primary px-4 py-2 rounded-lg text-sm font-medium">Try it</a>
+          </div>
         </div>
       </nav>
 

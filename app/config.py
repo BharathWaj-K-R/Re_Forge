@@ -16,3 +16,6 @@ GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
 
 AGENT_MODE = os.getenv("AGENT_MODE", "classic").lower().strip()
 AGENT_TIMEOUT_SECONDS = float(os.getenv("AGENT_TIMEOUT_SECONDS", "25"))
+
+DATABASE_URL = os.getenv("DATABASE_URL", "")
+JWT_SECRET = os.getenv("JWT_SECRET", "reforge-dev-secret-change-in-production")

@@ -57,7 +57,7 @@ export default function AuthPage() {
               {isLogin ? "Welcome back" : "Join ReForge"}
             </div>
             <h1 className="text-4xl font-display font-semibold mb-2">
-              {isLogin ? "Sign <span>in</span>" : "Create <span>account</span>"}
+              {isLogin ? <>Sign <span className="text-gradient">in</span></> : <>Create <span className="text-gradient">account</span></>}
             </h1>
             <p className="text-muted-foreground text-sm">
               {isLogin

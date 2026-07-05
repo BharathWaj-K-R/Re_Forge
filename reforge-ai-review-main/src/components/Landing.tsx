@@ -5,7 +5,11 @@ import HeroOrb from "./HeroOrb";
 import MiniCards from "./MiniCards";
 import { useAuth } from "../contexts/AuthContext";
 
-const LANGS = ["javascript", "typescript", "python", "go", "rust", "java", "cpp"];
+const LANGS = [
+  "javascript", "typescript", "python", "go", "rust", "java", "cpp", "c", "csharp",
+  "php", "ruby", "swift", "kotlin", "scala", "r", "perl", "lua", "dart",
+  "html", "css", "sql", "shell", "yaml", "json", "xml", "markdown"
+];
 
 const SAMPLE = `function getUser(id) {
   const query = "SELECT * FROM users WHERE id = " + id;

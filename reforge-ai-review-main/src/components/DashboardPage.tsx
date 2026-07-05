@@ -3,7 +3,11 @@ import { useNavigate, Link } from "react-router-dom";
 import { Sparkles, Loader2, Play, LogOut, History, Trash2, AlertTriangle, Code2, Shield, Zap, Lightbulb, ChevronDown, User } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 
-const LANGS = ["javascript", "typescript", "python", "go", "rust", "java", "cpp"];
+const LANGS = [
+  "javascript", "typescript", "python", "go", "rust", "java", "cpp", "c", "csharp",
+  "php", "ruby", "swift", "kotlin", "scala", "r", "perl", "lua", "dart",
+  "html", "css", "sql", "shell", "yaml", "json", "xml", "markdown"
+];
 
 const SAMPLE = `function getUser(id) {
   const query = "SELECT * FROM users WHERE id = " + id;

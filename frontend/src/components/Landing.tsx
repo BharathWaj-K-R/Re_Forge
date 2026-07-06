@@ -130,8 +130,8 @@ function ScoreRing({ score }: { score: number }) {
   const offset = c - (pct / 100) * c;
   const color = pct >= 80 ? "var(--success)" : pct >= 60 ? "var(--warning)" : "var(--danger)";
   return (
-    <div className="relative w-32 h-32">
-      <svg viewBox="0 0 120 120" className="w-full h-full -rotate-90">
+    <div className="relative w-32 h-32 flex-shrink-0">
+      <svg viewBox="0 0 120 120" className="absolute inset-0 w-full h-full -rotate-90">
         <circle cx="60" cy="60" r={r} fill="none" stroke="var(--muted)" strokeWidth="10" />
         <circle
           cx="60" cy="60" r={r} fill="none" stroke={color} strokeWidth="10"
@@ -139,7 +139,7 @@ function ScoreRing({ score }: { score: number }) {
           style={{ transition: "stroke-dashoffset 1s ease" }}
         />
       </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
+      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
         <div className="text-3xl font-display font-semibold text-gradient">{Math.round(pct)}</div>
         <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Score</div>
       </div>

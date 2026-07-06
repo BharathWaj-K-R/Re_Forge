@@ -188,7 +188,7 @@ export default function DashboardPage() {
                   rows={16}
                   spellCheck={false}
                   placeholder="Paste your code here..."
-                  className="w-full px-4 py-3 rounded-lg border bg-background text-sm font-mono leading-relaxed resize-none focus:outline-none focus:ring-2 focus:ring-ring transition"
+                  className="w-full px-4 py-3 rounded-lg border bg-background text-sm font-mono leading-relaxed resize-none focus:outline-none focus:ring-2 focus:ring-ring transition max-h-[400px] overflow-y-auto"
                 />
                 <button
                   onClick={runReview}
@@ -202,7 +202,7 @@ export default function DashboardPage() {
             </div>
 
             {/* RIGHT: Results */}
-            <div className="space-y-4">
+            <div className="space-y-4 max-h-[calc(100vh-16rem)] overflow-y-auto">
               {!result && !loading && (
                 <div className="rounded-2xl border bg-card p-8 shadow-[var(--shadow-elegant)] flex flex-col items-center justify-center min-h-[400px] text-center">
                   <div className="w-16 h-16 rounded-2xl mb-4 flex items-center justify-center" style={{ background: "var(--gradient-brand)", boxShadow: "var(--shadow-glow)" }}>

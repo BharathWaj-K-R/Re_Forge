@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { Sparkles, Loader2, Play, LogOut, History, Trash2, AlertTriangle, Code2, Shield, Zap, Lightbulb, ChevronDown, User } from "lucide-react";
+import { Sparkles, Loader2, Play, LogOut, History, Trash2, AlertTriangle, Code2, Shield, Zap, Lightbulb, ChevronDown, ChevronUp, User } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 
 const LANGS = [
@@ -78,9 +78,10 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const [code, setCode] = useState(SAMPLE);
   const [lang, setLang] = useState("javascript");
-  const [result, setResult] = useState<ReviewResult | null>(null);
   const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<ReviewResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [resultsExpanded, setResultsExpanded] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
 
   // Redirect if not authenticated
@@ -222,43 +223,79 @@ export default function DashboardPage() {
 
               {result && (
                 <>
-                  {/* Score */}
-                  <div className="rounded-xl border bg-card p-4 shadow-[var(--shadow-elegant)]">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium">Overall score</span>
-                      <div className="flex items-baseline gap-1">
-                        <span className="text-xl font-display font-bold" style={{ color: scoreColor }}>{Math.round(result.overallScore)}</span>
-                        <span className="text-xs text-muted-foreground font-normal">/100</span>
+                  {/* Collapsible Results */}
+                  <div className="rounded-xl border bg-card shadow-[var(--shadow-elegant)] overflow-hidden">
+                    {/* Header - Always Visible */}
+                    <div className="p-4 flex items-center justify-between cursor-pointer hover:bg-muted/50 transition" onClick={() => setResultsExpanded(!resultsExpanded)}>
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: scoreColor + "20" }}>
+                          <span className="text-lg font-display font-bold" style={{ color: scoreColor }}>{Math.round(result.overallScore)}</span>
+                        </div>
+                        <div>
+                          <div className="text-sm font-medium">Review Complete</div>
+                          <div className="text-xs text-muted-foreground">{result.summary.slice(0, 60)}{result.summary.length > 60 ? '...' : ''}</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="flex gap-1">
+                          {[
+                            { label: "B", score: result.bugs.score, color: "var(--accent-danger)" },
+                            { label: "S", score: result.security.score, color: "var(--accent-warning)" },
+                            { label: "P", score: result.performance.score, color: "var(--accent-info)" },
+                            { label: "BP", score: result.bestPractices.score, color: "var(--accent-success)" },
+                          ].map((c) => (
+                            <div key={c.label} className="w-7 h-7 rounded flex items-center justify-center text-[10px] font-bold" style={{ background: c.color + "20", color: c.color }}>
+                              {Math.round(c.score)}
+                            </div>
+                          ))}
+                        </div>
+                        {resultsExpanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
                       </div>
                     </div>
-                    <div className="w-full h-1.5 rounded-full bg-muted overflow-hidden">
-                      <div className="h-full rounded-full transition-all duration-700" style={{ width: `${result.overallScore}%`, background: scoreColor }} />
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-2">{result.summary}</p>
-                  </div>
 
-                  {/* Categories */}
-                  <div className="grid grid-cols-2 gap-2">
-                    {[
-                      { label: "Bugs", cat: result.bugs, icon: AlertTriangle, color: "var(--accent-danger)" },
-                      { label: "Security", cat: result.security, icon: Shield, color: "var(--accent-warning)" },
-                      { label: "Performance", cat: result.performance, icon: Zap, color: "var(--accent-info)" },
-                      { label: "Best Practices", cat: result.bestPractices, icon: Lightbulb, color: "var(--accent-success)" },
-                    ].map((c) => (
-                      <div key={c.label} className="rounded-lg border bg-card p-3 shadow-[var(--shadow-card)]">
-                        <div className="flex items-center justify-between mb-1.5">
-                          <span className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground">
-                            <c.icon className="w-3 h-3" /> {c.label}
-                          </span>
-                          <span className="text-xs font-bold" style={{ color: c.color }}>{Math.round(c.cat.score)}</span>
+                    {/* Expanded Content */}
+                    {resultsExpanded && (
+                      <div className="border-t p-4 space-y-3">
+                        {/* Overall Score */}
+                        <div>
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm font-medium">Overall score</span>
+                            <div className="flex items-baseline gap-1">
+                              <span className="text-xl font-display font-bold" style={{ color: scoreColor }}>{Math.round(result.overallScore)}</span>
+                              <span className="text-xs text-muted-foreground font-normal">/100</span>
+                            </div>
+                          </div>
+                          <div className="w-full h-1.5 rounded-full bg-muted overflow-hidden">
+                            <div className="h-full rounded-full transition-all duration-700" style={{ width: `${result.overallScore}%`, background: scoreColor }} />
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-2">{result.summary}</p>
                         </div>
-                        <div className="space-y-0.5">
-                          {c.cat.issues.slice(0, 3).map((issue, i) => (
-                            <p key={i} className="text-[11px] text-muted-foreground line-clamp-2">{issue}</p>
+
+                        {/* Categories */}
+                        <div className="grid grid-cols-2 gap-2">
+                          {[
+                            { label: "Bugs", cat: result.bugs, icon: AlertTriangle, color: "var(--accent-danger)" },
+                            { label: "Security", cat: result.security, icon: Shield, color: "var(--accent-warning)" },
+                            { label: "Performance", cat: result.performance, icon: Zap, color: "var(--accent-info)" },
+                            { label: "Best Practices", cat: result.bestPractices, icon: Lightbulb, color: "var(--accent-success)" },
+                          ].map((c) => (
+                            <div key={c.label} className="rounded-lg border bg-card p-3 shadow-[var(--shadow-card)]">
+                              <div className="flex items-center justify-between mb-1.5">
+                                <span className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground">
+                                  <c.icon className="w-3 h-3" /> {c.label}
+                                </span>
+                                <span className="text-xs font-bold" style={{ color: c.color }}>{Math.round(c.cat.score)}</span>
+                              </div>
+                              <div className="space-y-0.5">
+                                {c.cat.issues.slice(0, 3).map((issue, i) => (
+                                  <p key={i} className="text-[11px] text-muted-foreground line-clamp-2">{issue}</p>
+                                ))}
+                              </div>
+                            </div>
                           ))}
                         </div>
                       </div>
-                    ))}
+                    )}
                   </div>
                 </>
               )}

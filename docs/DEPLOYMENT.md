@@ -5,7 +5,7 @@ ReForge uses a two-service architecture on Render:
 | Service | Type | Root Directory | Purpose |
 |---|---|---|---|
 | `reforge-api` | Web Service | `/` (repo root) | Backend API |
-| `reforge-frontend` | Static Site | `reforge-ai-review-main/` | Frontend UI |
+| `reforge-frontend` | Static Site | `frontend/` | Frontend UI |
 
 Both services are independent and deploy separately.
 
@@ -23,7 +23,7 @@ services:
     name: reforge-api
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
 ```
 
@@ -44,7 +44,7 @@ If not using `render.yaml`, configure manually:
 | **Type** | Web Service |
 | **Environment** | Python 3 |
 | **Build Command** | `pip install -r requirements.txt` |
-| **Start Command** | `uvicorn app.main:app --host 0.0.0.0 --port $PORT` |
+| **Start Command** | `uvicorn backend.main:app --host 0.0.0.0 --port $PORT` |
 | **Health Check Path** | `/health` |
 
 ### Required Environment Variables
@@ -52,9 +52,7 @@ If not using `render.yaml`, configure manually:
 | Key | Required | Example |
 |---|---|---|
 | `GROQ_API_KEY` | Yes | `gsk_...` |
-| `FRONTEND_URL` | Recommended | `https://reforge-client.onrender.com` |
 | `NEW_FRONTEND_URL` | Recommended | `https://reforge-frontend.onrender.com` |
-| `AGENT_MODE` | Optional | `classic` (default) or `agentic` |
 | `AGENT_TIMEOUT_SECONDS` | Optional | `25` (default) |
 | `LOG_LEVEL` | Optional | `INFO` (default) |
 
@@ -73,7 +71,7 @@ See [ENVIRONMENT.md](ENVIRONMENT.md) for full details.
 | Setting | Value |
 |---|---|
 | **Name** | `reforge-frontend` |
-| **Root Directory** | `reforge-ai-review-main` |
+| **Root Directory** | `frontend` |
 | **Build Command** | `npm install && npm run build` |
 | **Publish Directory** | `dist` |
 | **Branch** | `main` |
@@ -96,20 +94,6 @@ After the frontend is live:
 2. Go to the backend Web Service → **Environment**
 3. Set `NEW_FRONTEND_URL` to that URL
 4. Save → backend redeploys automatically
-
----
-
-## Old Frontend (Legacy)
-
-The old frontend (`client/`) remains untouched and deployable. Its Render Static Site uses:
-
-| Setting | Value |
-|---|---|
-| **Root Directory** | `client` |
-| **Build Command** | `npm install && npm run build` |
-| **Publish Directory** | `dist` |
-
-Both frontends can run side-by-side, pointing at the same backend.
 
 ---
 
@@ -136,8 +120,7 @@ Both frontends can run side-by-side, pointing at the same backend.
     │  uvicorn start     │           │  dist/ published       │
     │                    │           │                        │
     │  Env: GROQ_API_KEY │           │  Env: VITE_API_URL     │
-    │       FRONTEND_URL │           │       → baked into JS  │
-    │       NEW_FRONTEND │           │                        │
+    │       NEW_FRONTEND │           │       → baked into JS  │
     └────────────────────┘           └────────────────────────┘
 ```
 
@@ -175,12 +158,11 @@ View in Render dashboard under each service's **Logs** tab. Key log messages:
 
 | Log Pattern | Meaning |
 |---|---|
-| `Review request: mode=classic` | Classic pipeline handling request |
-| `Classic review: mode=classic score=XX` | Classic review completed |
+| `Review request for language=...` | Review request received |
 | `Starting agentic review` | Agentic pipeline started |
 | `Agentic review complete: llm_calls=N score=XX` | Agentic review finished |
-| `Agentic pipeline timed out` | Fell back to classic |
-| `Agentic pipeline failed` | Fell back to classic |
+| `Agentic pipeline timed out` | Returned failure envelope |
+| `Agentic pipeline failed` | Returned failure envelope |
 
 ---
 
@@ -191,5 +173,5 @@ View in Render dashboard under each service's **Logs** tab. Key log messages:
 | Frontend shows "Live API failed" | CORS not configured | Set `NEW_FRONTEND_URL` in backend env |
 | Frontend shows "offline demo mode" | `VITE_API_URL` not set | Set env var and redeploy Static Site |
 | Backend returns 500 | Groq API key missing | Set `GROQ_API_KEY` in backend env |
-| Build fails on Static Site | Wrong root directory | Set Root Directory to `reforge-ai-review-main` |
+| Build fails on Static Site | Wrong root directory | Set Root Directory to `frontend` |
 | CORS errors in browser console | Frontend URL not in allow-list | Add URL to `NEW_FRONTEND_URL` |

@@ -1,22 +1,21 @@
 """
-Agentic review pipeline for ReForge.
+Unified review pipeline for ReForge.
 
 Flow:
   1. Planner decides which specialist agents are relevant.
   2. Each specialist runs its own LLM call plus one deterministic tool.
   3. Critic deduplicates and filters all findings.
-  4. Existing validators normalize output.
+  4. Validators normalize output.
   5. Deterministic score engine calculates the final score.
 """
 
 import json
 import logging
+from concurrent.futures import ThreadPoolExecutor, TimeoutError
 
-from app.ai import call_llm
-from app.agents.best_practice import validate_best_practice_review
-from app.agents.bug import validate_bug_review
-from app.agents.performance import validate_performance_review
-from app.agents.prompts import (
+from backend.ai import call_llm
+from backend.config import AGENT_TIMEOUT_SECONDS
+from backend.review_pipeline.prompts import (
     BEST_PRACTICE_AGENT_PROMPT,
     BUG_AGENT_PROMPT,
     CRITIC_PROMPT,
@@ -24,13 +23,13 @@ from app.agents.prompts import (
     PLANNER_PROMPT,
     SECURITY_AGENT_PROMPT,
 )
-from app.agents.score_engine import calculate_score
-from app.agents.security import validate_security_review
-from app.agents.tools import (
+from backend.review_pipeline.tools import (
     ast_quick_check,
     detect_hardcoded_secrets,
     detect_infinite_loops,
 )
+from backend.review_pipeline.validators import validate
+from backend.review_pipeline.score import calculate_score
 
 logger = logging.getLogger(__name__)
 
@@ -168,12 +167,11 @@ Findings by category:
     return data
 
 
-def review_agentic(code: str, language: str) -> dict:
+def _run_agentic(code: str, language: str) -> dict:
     """
     Run the multi-step agentic review pipeline.
 
-    Returns the same response envelope as the classic pipeline:
-    {success, language, overall_score, summary, reviews}.
+    Returns the standard review envelope.
     """
 
     logger.info("Starting agentic review for language=%s", language)
@@ -202,12 +200,12 @@ def review_agentic(code: str, language: str) -> dict:
     summary = critic_result.get("summary", "")
     reviews = critic_result.get("reviews", {})
 
-    # 4. Normalize with existing validators
+    # 4. Normalize with validators
     validated_reviews = {
-        "bug": validate_bug_review(reviews.get("bug", [])),
-        "security": validate_security_review(reviews.get("security", [])),
-        "performance": validate_performance_review(reviews.get("performance", [])),
-        "best_practice": validate_best_practice_review(reviews.get("best_practice", []))
+        "bug": validate("bug", reviews.get("bug", [])),
+        "security": validate("security", reviews.get("security", [])),
+        "performance": validate("performance", reviews.get("performance", [])),
+        "best_practice": validate("best_practice", reviews.get("best_practice", [])),
     }
 
     # 5. Score
@@ -226,3 +224,51 @@ def review_agentic(code: str, language: str) -> dict:
         "summary": summary,
         "reviews": validated_reviews
     }
+
+
+def _run_agentic_with_timeout(code: str, language: str, timeout: float):
+    """
+    Run the agentic pipeline in a worker thread so we can enforce a timeout.
+    """
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(_run_agentic, code, language)
+        return future.result(timeout=timeout)
+
+
+def review(code: str, language: str):
+    """
+    Public entry point called by routes.py.
+
+    Runs the agentic pipeline with a timeout guard.
+    On timeout/failure, returns honest failure envelope.
+    """
+
+    logger.info("Review request for language=%s", language)
+
+    try:
+        return _run_agentic_with_timeout(
+            code,
+            language,
+            timeout=AGENT_TIMEOUT_SECONDS
+        )
+    except TimeoutError:
+        logger.warning(
+            "Agentic pipeline timed out after %ss",
+            AGENT_TIMEOUT_SECONDS
+        )
+        return {
+            "success": False,
+            "language": language,
+            "overall_score": 0,
+            "summary": "Review timed out. Please try again.",
+            "reviews": {"bug": [], "security": [], "performance": [], "best_practice": []}
+        }
+    except Exception as e:
+        logger.warning("Agentic pipeline failed: %s", e)
+        return {
+            "success": False,
+            "language": language,
+            "overall_score": 0,
+            "summary": "Review failed. Please try again.",
+            "reviews": {"bug": [], "security": [], "performance": [], "best_practice": []}
+        }

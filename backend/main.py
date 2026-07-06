@@ -3,9 +3,9 @@ from fastapi.middleware.cors import CORSMiddleware
 import os
 from dotenv import load_dotenv
 
-from app.routes import router
-from app.auth import router as auth_router
-from app.database import engine, Base
+from backend.routes import router
+from backend.auth import router as auth_router
+from backend.database import engine, Base
 
 load_dotenv()
 
@@ -22,8 +22,6 @@ app = FastAPI(
 origins = [
     "http://localhost:5173",
     "http://localhost:3000",
-    "https://reforge-client.onrender.com",
-    os.getenv("FRONTEND_URL", ""),
     os.getenv("NEW_FRONTEND_URL", ""),
 ]
 

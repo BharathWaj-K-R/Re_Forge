@@ -21,11 +21,6 @@ Both services are independent and can be deployed, scaled, and updated separatel
 │  │                        │       │  Three.js + shadcn/ui     │ │
 │  │  /review  /health  /   │       │  VITE_API_URL (build)     │ │
 │  └────────────────────────┘       └───────────────────────────┘ │
-│                                                                  │
-│  ┌────────────────────────┐                                      │
-│  │  Old Frontend (legacy) │  Untouched, still deployable        │
-│  │  client/               │                                      │
-│  └────────────────────────┘                                      │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -45,18 +40,18 @@ Client (Browser)
          │
          ▼
 ┌─────────────────┐
-│  Orchestrator    │  Checks AGENT_MODE env var
-│  orchestrator.py │
+│  Pipeline        │  Unified agentic pipeline
+│  pipeline.py     │  with timeout guard
 └────────┬────────┘
          │
     ┌────┴─────┐
     │          │
     ▼          ▼
- Classic    Agentic
- (default)  (optional)
+ Agentic    Classic
+ (default)  (fallback)
 ```
 
-### Classic Pipeline (Default)
+### Classic Pipeline (Fallback)
 
 The classic pipeline makes a single LLM call, then validates and scores deterministically.
 
@@ -72,14 +67,14 @@ Code + Language
          ▼
 ┌──────────────────────────────────┐
 │  Validation Layer                 │  Normalizes schema,
-│  bug.py / security.py /          │  fixes invalid severities,
-│  performance.py / best_practice.py│  ensures all fields present
+│  validators.py                    │  fixes invalid severities,
+│                                    │  ensures all fields present
 └────────┬─────────────────────────┘
          │
          ▼
 ┌──────────────────┐
 │  Score Engine     │  100 - sum(severity deductions)
-│  score_engine.py  │  Floor at 0
+│  score.py         │  Floor at 0
 └────────┬──────────┘
          │
          ▼
@@ -91,7 +86,7 @@ Response Envelope
 **Latency:** ~1-3 seconds  
 **Reproducibility:** Same code + same findings = same score every time
 
-### Agentic Pipeline (Optional)
+### Agentic Pipeline (Default)
 
 The agentic pipeline uses multiple specialized LLM calls with deterministic tools for deeper analysis.
 
@@ -133,19 +128,8 @@ Code + Language
 
 **LLM calls:** 3-6  
 **Latency:** ~5-15 seconds  
-**Timeout:** Configurable (default 25s), falls back to classic on timeout  
+**Timeout:** Configurable (default 25s), returns honest failure on timeout  
 **Deterministic tools:** AST check, secret detection, infinite loop detection
-
-### Mode Switching
-
-Controlled by the `AGENT_MODE` environment variable:
-
-| Value | Behavior |
-|---|---|
-| `classic` (default) | Single LLM call pipeline |
-| `agentic` | Multi-agent pipeline with timeout fallback |
-
-If agentic mode fails or times out, the system automatically falls back to classic mode for that request.
 
 ## Frontend Architecture
 
@@ -162,16 +146,14 @@ If agentic mode fails or times out, the system automatically falls back to class
 
 ```
 main.tsx
-  └── Landing.tsx (main page component)
-        ├── HeroOrb.tsx (Three.js 3D sphere)
-        ├── MiniCards.tsx (Three.js floating cards)
-        └── UI Sections:
-            ├── Nav (fixed glass-morphism navbar)
-            ├── Hero (branding + 3D orb)
-            ├── Demo (code editor + review results)
-            ├── Features (4 category descriptions)
-            ├── How It Works (3-step explainer)
-            └── Footer (links)
+  └── Routes:
+      ├── Landing.tsx (public page)
+      │     ├── HeroOrb.tsx (Three.js 3D sphere)
+      │     ├── MiniCards.tsx (Three.js floating cards)
+      │     └── UI Sections: Nav, Hero, Demo, Features, How, Footer
+      ├── DashboardPage.tsx (authenticated review dashboard)
+      ├── AuthPage.tsx (login/register)
+      └── HistoryPage.tsx (review history + detail modal)
 ```
 
 ### API Integration
@@ -206,7 +188,7 @@ Frontend sends POST /review
 Backend validates request (Pydantic)
         │
         ▼
-Review pipeline runs (classic or agentic)
+Review pipeline runs (agentic only)
         │
         ▼
 Backend returns structured response
@@ -242,7 +224,7 @@ This ensures identical findings always produce identical scores, regardless of m
 
 1. **Deterministic scoring** — The model generates findings; logic computes scores
 2. **Validation before output** — Every AI finding passes through a validator
-3. **Graceful degradation** — Agentic falls back to classic; frontend falls back to mock
+3. **Graceful degradation** — Agentic → error envelope → mock analysis
 4. **Separation of concerns** — Each module has one responsibility
 5. **Reproducibility** — Same input → same output, every time
 6. **Two-service architecture** — Frontend and backend deploy independently

@@ -51,7 +51,6 @@ Create a `.env` file in the project root:
 
 ```env
 GROQ_API_KEY=gsk_your_key_here
-AGENT_MODE=classic
 LOG_LEVEL=DEBUG
 ```
 
@@ -60,7 +59,7 @@ Get a Groq API key at [console.groq.com](https://console.groq.com).
 **Start the backend:**
 
 ```bash
-uvicorn app.main:app --reload --port 8000
+uvicorn backend.main:app --reload --port 8000
 ```
 
 The `--reload` flag enables auto-restart on code changes.
@@ -79,13 +78,13 @@ Interactive API docs: [http://localhost:8000/docs](http://localhost:8000/docs)
 **Install dependencies:**
 
 ```bash
-cd reforge-ai-review-main
+cd frontend
 npm install
 ```
 
 **Configure environment:**
 
-Create a `.env` file inside `reforge-ai-review-main/`:
+Create a `.env` file inside `frontend/`:
 
 ```env
 VITE_API_URL=http://localhost:8000
@@ -105,38 +104,41 @@ Open [http://localhost:5173](http://localhost:5173) in your browser.
 
 ```
 Re_Forge/
-├── app/                          # Backend Python package
+├── backend/                      # Backend Python package
 │   ├── main.py                   # FastAPI app + CORS
 │   ├── config.py                 # Centralized env var loading
 │   ├── routes.py                 # HTTP endpoints
 │   ├── ai.py                     # Groq LLM client
-│   └── agents/                   # Review pipeline
-│       ├── orchestrator.py       # Mode dispatcher
-│       ├── agentic_orchestrator.py # Multi-agent pipeline
+│   ├── auth.py                   # JWT authentication
+│   ├── database.py               # SQLAlchemy connection
+│   ├── models.py                 # DB models (User, Review)
+│   └── review_pipeline/          # Review pipeline
+│       ├── pipeline.py           # Unified pipeline (entry point)
 │       ├── prompts.py            # Agent system prompts
-│       ├── bug.py                # Bug validator
-│       ├── security.py           # Security validator
-│       ├── performance.py        # Performance validator
-│       ├── best_practice.py      # Best practice validator
-│       ├── score_engine.py       # Deterministic scoring
+│       ├── validators.py         # Review finding validators
+│       ├── score.py              # Deterministic scoring
 │       └── tools.py              # Deterministic analysis tools
 │
-├── reforge-ai-review-main/       # New frontend
+├── frontend/                     # React frontend
 │   ├── src/
 │   │   ├── main.tsx              # React entry point
 │   │   ├── styles.css            # Tailwind theme
 │   │   ├── components/
 │   │   │   ├── Landing.tsx       # Main page
+│   │   │   ├── DashboardPage.tsx # Authenticated review dashboard
+│   │   │   ├── AuthPage.tsx      # Login/register
+│   │   │   ├── HistoryPage.tsx   # Review history
 │   │   │   ├── HeroOrb.tsx       # 3D orb
 │   │   │   ├── MiniCards.tsx     # 3D cards
 │   │   │   └── ui/              # shadcn/ui components
+│   │   ├── contexts/
+│   │   │   └── AuthContext.tsx   # Auth state management
 │   │   ├── hooks/
 │   │   └── lib/
 │   ├── package.json
 │   └── vite.config.ts
 │
-├── client/                       # Old frontend (legacy)
-├── DOCUMENTATION/                # Documentation
+├── docs/                         # Documentation
 ├── .env                          # Backend secrets (gitignored)
 ├── requirements.txt              # Python dependencies
 ├── render.yaml                   # Render IaC
@@ -149,8 +151,8 @@ Re_Forge/
 
 ### Testing a Review Locally
 
-1. Start backend: `uvicorn app.main:app --reload`
-2. Start frontend: `cd reforge-ai-review-main && npm run dev`
+1. Start backend: `uvicorn backend.main:app --reload`
+2. Start frontend: `cd frontend && npm run dev`
 3. Open `http://localhost:5173`
 4. Paste code → select language → click "Run Review"
 5. Results appear in the right panel
@@ -165,16 +167,6 @@ curl -X POST http://localhost:8000/review \
     "code": "def hello():\n    print(\"hello\")\n    eval(input())"
   }'
 ```
-
-### Switching to Agentic Mode
-
-Change `.env`:
-
-```env
-AGENT_MODE=agentic
-```
-
-Restart the backend. The `/review` endpoint now uses the multi-agent pipeline.
 
 ### Testing Without a Groq Key
 
@@ -198,8 +190,8 @@ If `GROQ_API_KEY` is not set, the backend returns a zero-score error envelope. T
 
 | Command | Description |
 |---|---|
-| `uvicorn app.main:app --reload` | Dev server with auto-reload |
-| `uvicorn app.main:app --host 0.0.0.0 --port 8000` | Production-like start |
+| `uvicorn backend.main:app --reload` | Dev server with auto-reload |
+| `uvicorn backend.main:app --host 0.0.0.0 --port 8000` | Production-like start |
 | `pip install -r requirements.txt` | Install/update dependencies |
 
 ---
@@ -210,8 +202,8 @@ If `GROQ_API_KEY` is not set, the backend returns a zero-score error envelope. T
 
 Set `LOG_LEVEL=DEBUG` in `.env` for verbose output. Key things to look for:
 
-- `Review request: mode=classic` — which pipeline is handling the request
-- `Classic review: mode=classic score=XX` — final score
+- `Review request for language=...` — review request received
+- `Agentic review complete: llm_calls=X score=XX` — final score
 - `Groq Error: ...` — LLM API failures
 
 ### Frontend Debugging

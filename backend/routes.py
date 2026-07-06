@@ -2,11 +2,10 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.ai import review_code
-from app.agents.orchestrator import review
-from app.auth import get_current_user
-from app.database import get_db
-from app.models import User, Review
+from backend.review_pipeline.pipeline import review
+from backend.auth import get_current_user
+from backend.database import get_db
+from backend.models import User, Review
 
 router = APIRouter()
 
@@ -35,16 +34,22 @@ def health():
 
 @router.get("/test-ai")
 def test_ai():
-
-    result = review_code(
-        language="python",
-        code="print('Hello ReForge')"
-    )
-
-    return {
-        "success": True,
-        "result": result
-    }
+    from backend.ai import call_llm
+    try:
+        result = call_llm(
+            system_prompt="You are a test assistant.",
+            user_prompt="Say hello in one word.",
+            response_format="text"
+        )
+        return {
+            "success": True,
+            "result": result
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }
 
 
 @router.post("/review")
@@ -83,7 +88,7 @@ def get_history(
     db: Session = Depends(get_db),
 ):
     """Return the authenticated user's review history."""
-    from app.auth import require_user
+    from backend.auth import require_user
     user = require_user(current_user)
 
     reviews = (
@@ -116,7 +121,7 @@ def get_review_detail(
     db: Session = Depends(get_db),
 ):
     """Return full detail of a single review."""
-    from app.auth import require_user
+    from backend.auth import require_user
     user = require_user(current_user)
 
     review_record = (
@@ -148,7 +153,7 @@ def clear_history(
     db: Session = Depends(get_db),
 ):
     """Delete all review history for the authenticated user."""
-    from app.auth import require_user
+    from backend.auth import require_user
     user = require_user(current_user)
 
     deleted = db.query(Review).filter(Review.user_id == user.id).delete()
@@ -166,7 +171,7 @@ def delete_account(
     db: Session = Depends(get_db),
 ):
     """Delete the authenticated user's account and all their data."""
-    from app.auth import require_user
+    from backend.auth import require_user
     user = require_user(current_user)
 
     # Delete all reviews first (cascade should handle this, but be explicit)

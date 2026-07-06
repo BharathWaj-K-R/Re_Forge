@@ -8,7 +8,11 @@ type AuthContextType = {
   user: User | null;
   token: string | null;
   login: (email: string, password: string) => Promise<string | null>;
-  register: (email: string, password: string, name: string) => Promise<string | null>;
+  register: (email: string, password: string, name: string) => Promise<{ error: string | null; email?: string }>;
+  verifyOtp: (email: string, otp: string) => Promise<string | null>;
+  resendOtp: (email: string) => Promise<string | null>;
+  forgotPassword: (email: string) => Promise<string | null>;
+  resetPassword: (email: string, otp: string, newPassword: string) => Promise<string | null>;
   logout: () => void;
   deleteAccount: () => Promise<string | null>;
   clearHistory: () => Promise<string | null>;
@@ -67,8 +71,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  async function register(email: string, password: string, name: string): Promise<string | null> {
-    if (!API_URL) return "API URL not configured";
+  async function register(email: string, password: string, name: string): Promise<{ error: string | null; email?: string }> {
+    if (!API_URL) return { error: "API URL not configured" };
     try {
       const res = await fetch(`${API_URL}/auth/register`, {
         method: "POST",
@@ -77,13 +81,86 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        return err.detail || `Registration failed (${res.status})`;
+        return { error: err.detail || `Registration failed (${res.status})` };
+      }
+      const data = await res.json();
+      return { error: null, email: data.email };
+    } catch (e: any) {
+      return { error: e.message || "Registration failed" };
+    }
+  }
+
+  async function verifyOtp(email: string, otp: string): Promise<string | null> {
+    if (!API_URL) return "API URL not configured";
+    try {
+      const res = await fetch(`${API_URL}/auth/verify-otp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, otp }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        return err.detail || `Verification failed (${res.status})`;
       }
       const data = await res.json();
       saveSession(data.user, data.access_token);
       return null;
     } catch (e: any) {
-      return e.message || "Registration failed";
+      return e.message || "Verification failed";
+    }
+  }
+
+  async function resendOtp(email: string): Promise<string | null> {
+    if (!API_URL) return "API URL not configured";
+    try {
+      const res = await fetch(`${API_URL}/auth/resend-otp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        return err.detail || `Failed to resend OTP (${res.status})`;
+      }
+      return null;
+    } catch (e: any) {
+      return e.message || "Failed to resend OTP";
+    }
+  }
+
+  async function forgotPassword(email: string): Promise<string | null> {
+    if (!API_URL) return "API URL not configured";
+    try {
+      const res = await fetch(`${API_URL}/auth/forgot-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        return err.detail || `Failed to send reset code (${res.status})`;
+      }
+      return null;
+    } catch (e: any) {
+      return e.message || "Failed to send reset code";
+    }
+  }
+
+  async function resetPassword(email: string, otp: string, newPassword: string): Promise<string | null> {
+    if (!API_URL) return "API URL not configured";
+    try {
+      const res = await fetch(`${API_URL}/auth/reset-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, otp, new_password: newPassword }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        return err.detail || `Failed to reset password (${res.status})`;
+      }
+      return null;
+    } catch (e: any) {
+      return e.message || "Failed to reset password";
     }
   }
 
@@ -123,7 +200,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, token, login, register, logout, deleteAccount, clearHistory, isAuthenticated: !!token }}>
+    <AuthContext.Provider value={{ user, token, login, register, verifyOtp, resendOtp, forgotPassword, resetPassword, logout, deleteAccount, clearHistory, isAuthenticated: !!token }}>
       {children}
     </AuthContext.Provider>
   );

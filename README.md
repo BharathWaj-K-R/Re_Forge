@@ -24,10 +24,9 @@ ReForge analyzes source code using large language models and returns structured 
 ## Features
 
 - **Multi-agent validation pipeline** — Every finding is validated before it reaches the user
-- **Two pipeline modes** — Classic (fast, single LLM call) or Agentic (deep, multi-agent with tools)
 - **Deterministic scoring** — Same findings always produce the same score, independent of model self-assessment
 - **4 review categories** — Bugs, Security, Performance, Best Practices
-- **Graceful degradation** — Agentic falls back to classic on timeout; frontend falls back to mock analysis
+- **Graceful degradation** — Timeout returns honest failure envelope; frontend falls back to mock analysis
 - **Dual frontend support** — Old and new frontends run side-by-side on the same backend
 - **Modern UI** — Glass-morphism design, Three.js 3D animations, responsive layout
 - **Production-ready** — Deployed on Render with health checks, CORS, and IaC configuration
@@ -43,14 +42,9 @@ Client (Browser)
 FastAPI Backend
       │
       ▼
-Orchestrator (mode check)
+Agentic Pipeline
+(3-6 LLMs + Tools)
       │
-  ┌───┴────┐
-  ▼        ▼
-Classic  Agentic
-(1 LLM)  (3-6 LLMs + Tools)
-  │        │
-  └───┬────┘
       ▼
 Validation Layer
 (bug / security / performance / best_practice)
@@ -69,7 +63,7 @@ Two independent services on Render:
 | **Backend** | Web Service | FastAPI + Groq Llama 3.3 70B |
 | **Frontend** | Static Site | Vite 8 + React 19 + Tailwind v4 + Three.js |
 
-See [Architecture Docs](DOCUMENTATION/ARCHITECTURE.md) for the full system design.
+See [Architecture Docs](docs/ARCHITECTURE.md) for the full system design.
 
 ---
 
@@ -100,7 +94,7 @@ pip install -r requirements.txt
 # Create .env at project root
 echo GROQ_API_KEY=your_key_here > .env
 
-uvicorn app.main:app --reload
+uvicorn backend.main:app --reload
 ```
 
 Backend runs at [http://localhost:8000](http://localhost:8000). API docs at [http://localhost:8000/docs](http://localhost:8000/docs).
@@ -108,11 +102,11 @@ Backend runs at [http://localhost:8000](http://localhost:8000). API docs at [htt
 ### 3. Frontend
 
 ```bash
-cd reforge-ai-review-main
+cd frontend
 
 npm install
 
-# Create .env inside reforge-ai-review-main/
+# Create .env inside frontend/
 echo VITE_API_URL=http://localhost:8000 > .env
 
 npm run dev
@@ -120,7 +114,7 @@ npm run dev
 
 Frontend runs at [http://localhost:5173](http://localhost:5173).
 
-See [Development Guide](DOCUMENTATION/DEVELOPMENT.md) for full setup instructions and troubleshooting.
+See [Development Guide](docs/DEVELOPMENT.md) for full setup instructions and troubleshooting.
 
 ---
 
@@ -158,7 +152,7 @@ curl -X POST http://localhost:8000/review \
 }
 ```
 
-See [API Reference](DOCUMENTATION/API_REFERENCE.md) for the full endpoint documentation.
+See [API Reference](docs/API_REFERENCE.md) for the full endpoint documentation.
 
 ---
 
@@ -196,23 +190,19 @@ Starting score: **100** | Floor: **0**
 
 ```
 Re_Forge/
-├── app/                          # Backend
+├── backend/                      # Backend
 │   ├── main.py                   # FastAPI app + CORS
 │   ├── config.py                 # Centralized env config
 │   ├── routes.py                 # HTTP endpoints
 │   ├── ai.py                     # Groq LLM client
-│   └── agents/                   # Review pipeline
-│       ├── orchestrator.py       # Mode dispatcher
-│       ├── agentic_orchestrator.py # Multi-agent pipeline
+│   └── review_pipeline/          # Review pipeline
+│       ├── pipeline.py           # Unified agentic pipeline
 │       ├── prompts.py            # Agent system prompts
-│       ├── bug.py                # Bug validator
-│       ├── security.py           # Security validator
-│       ├── performance.py        # Performance validator
-│       ├── best_practice.py      # Best practice validator
-│       ├── score_engine.py       # Deterministic scoring
+│       ├── validators.py         # Unified validator
+│       ├── score.py              # Deterministic scoring
 │       └── tools.py              # AST, secrets, loop tools
 │
-├── reforge-ai-review-main/       # New Frontend
+├── frontend/                     # Frontend
 │   ├── src/
 │   │   ├── main.tsx              # Entry point
 │   │   ├── styles.css            # Tailwind theme
@@ -226,8 +216,7 @@ Re_Forge/
 │   ├── package.json
 │   └── vite.config.ts
 │
-├── client/                       # Old Frontend (legacy)
-├── DOCUMENTATION/                         # Documentation
+├── docs/                         # Documentation
 │   ├── ARCHITECTURE.md
 │   ├── API_REFERENCE.md
 │   ├── DEPLOYMENT.md
@@ -249,7 +238,7 @@ ReForge deploys on Render as two independent services:
 1. **Backend Web Service** — auto-deploys from `render.yaml`
 2. **Frontend Static Site** — configured in Render dashboard
 
-See [Deployment Guide](DOCUMENTATION/DEPLOYMENT.md) for step-by-step instructions.
+See [Deployment Guide](docs/DEPLOYMENT.md) for step-by-step instructions.
 
 ---
 
@@ -257,12 +246,12 @@ See [Deployment Guide](DOCUMENTATION/DEPLOYMENT.md) for step-by-step instruction
 
 | Document | Description |
 |---|---|
-| [Architecture](DOCUMENTATION/ARCHITECTURE.md) | System design, data flow, pipeline modes |
-| [API Reference](DOCUMENTATION/API_REFERENCE.md) | Complete endpoint documentation |
-| [Deployment](DOCUMENTATION/DEPLOYMENT.md) | Render deployment guide |
-| [Development](DOCUMENTATION/DEVELOPMENT.md) | Local development setup |
-| [Environment](DOCUMENTATION/ENVIRONMENT.md) | Environment variables reference |
-| [Security](DOCUMENTATION/SECURITY.md) | Security audit and policy |
+| [Architecture](docs/ARCHITECTURE.md) | System design, data flow, pipeline modes |
+| [API Reference](docs/API_REFERENCE.md) | Complete endpoint documentation |
+| [Deployment](docs/DEPLOYMENT.md) | Render deployment guide |
+| [Development](docs/DEVELOPMENT.md) | Local development setup |
+| [Environment](docs/ENVIRONMENT.md) | Environment variables reference |
+| [Security](docs/SECURITY.md) | Security audit and policy |
 
 ---
 
@@ -270,7 +259,7 @@ See [Deployment Guide](DOCUMENTATION/DEPLOYMENT.md) for step-by-step instruction
 
 1. **Deterministic scoring** — The model generates findings; logic computes scores
 2. **Validation before output** — Every AI finding passes through a validator
-3. **Graceful degradation** — Agentic → classic → error envelope → mock analysis
+3. **Graceful degradation** — Agentic → error envelope → mock analysis
 4. **Separation of concerns** — Each module has one responsibility
 5. **Reproducibility** — Same input produces the same output, every time
 6. **Two-service architecture** — Frontend and backend deploy independently

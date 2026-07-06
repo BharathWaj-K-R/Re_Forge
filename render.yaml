@@ -3,15 +3,11 @@ services:
     name: reforge-api
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: GROQ_API_KEY
         sync: false
-      - key: FRONTEND_URL
-        sync: false
       - key: NEW_FRONTEND_URL
-        sync: false
-      - key: AGENT_MODE
         sync: false
       - key: AGENT_TIMEOUT_SECONDS
         sync: false

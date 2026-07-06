@@ -130,7 +130,7 @@ function ScoreRing({ score }: { score: number }) {
   const offset = c - (pct / 100) * c;
   const color = pct >= 80 ? "var(--success)" : pct >= 60 ? "var(--warning)" : "var(--danger)";
   return (
-    <div className="relative w-32 h-32 flex-shrink-0">
+    <div className="relative w-24 h-24 flex-shrink-0">
       <svg viewBox="0 0 120 120" className="absolute inset-0 w-full h-full -rotate-90">
         <circle cx="60" cy="60" r={r} fill="none" stroke="var(--muted)" strokeWidth="10" />
         <circle
@@ -140,8 +140,8 @@ function ScoreRing({ score }: { score: number }) {
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-        <div className="text-3xl font-display font-semibold text-gradient">{Math.round(pct)}</div>
-        <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Score</div>
+        <div className="text-2xl font-display font-semibold text-gradient">{Math.round(pct)}</div>
+        <div className="text-[8px] uppercase tracking-widest text-muted-foreground">Score</div>
       </div>
     </div>
   );
@@ -149,20 +149,20 @@ function ScoreRing({ score }: { score: number }) {
 
 function CategoryCard({ icon: Icon, label, cat, tint }: { icon: any; label: string; cat: Category; tint: string }) {
   return (
-    <div className="rounded-2xl border bg-card p-5 shadow-[var(--shadow-soft)] hover:shadow-[var(--shadow-elegant)] transition-all">
-      <div className="flex items-center justify-between mb-3">
+    <div className="rounded-xl border bg-card p-4 shadow-[var(--shadow-soft)] hover:shadow-[var(--shadow-elegant)] transition-all">
+      <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: tint }}>
-            <Icon className="w-4 h-4 text-primary" />
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: tint }}>
+            <Icon className="w-3.5 h-3.5 text-primary" />
           </div>
-          <div className="font-medium">{label}</div>
+          <div className="text-sm font-medium">{label}</div>
         </div>
-        <div className="font-mono text-sm px-2 py-1 rounded-md bg-muted">{Math.round(cat.score)}</div>
+        <div className="font-mono text-xs px-2 py-0.5 rounded-md bg-muted">{Math.round(cat.score)}</div>
       </div>
-      <ul className="space-y-1.5">
+      <ul className="space-y-1">
         {cat.issues.slice(0, 3).map((i, idx) => (
-          <li key={idx} className="text-sm text-muted-foreground flex gap-2">
-            <span className="text-primary mt-1">•</span>
+          <li key={idx} className="text-xs text-muted-foreground flex gap-2">
+            <span className="text-primary mt-0.5">•</span>
             <span>{i}</span>
           </li>
         ))}

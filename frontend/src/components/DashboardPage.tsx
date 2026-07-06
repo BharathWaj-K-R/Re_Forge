@@ -223,38 +223,38 @@ export default function DashboardPage() {
               {result && (
                 <>
                   {/* Score */}
-                  <div className="rounded-2xl border bg-card p-5 shadow-[var(--shadow-elegant)]">
-                    <div className="flex items-center justify-between mb-3">
+                  <div className="rounded-xl border bg-card p-4 shadow-[var(--shadow-elegant)]">
+                    <div className="flex items-center justify-between mb-2">
                       <span className="text-sm font-medium">Overall score</span>
                       <div className="flex items-baseline gap-1">
-                        <span className="text-2xl font-display font-bold" style={{ color: scoreColor }}>{Math.round(result.overallScore)}</span>
-                        <span className="text-sm text-muted-foreground font-normal">/100</span>
+                        <span className="text-xl font-display font-bold" style={{ color: scoreColor }}>{Math.round(result.overallScore)}</span>
+                        <span className="text-xs text-muted-foreground font-normal">/100</span>
                       </div>
                     </div>
-                    <div className="w-full h-2 rounded-full bg-muted overflow-hidden">
+                    <div className="w-full h-1.5 rounded-full bg-muted overflow-hidden">
                       <div className="h-full rounded-full transition-all duration-700" style={{ width: `${result.overallScore}%`, background: scoreColor }} />
                     </div>
-                    <p className="text-sm text-muted-foreground mt-3">{result.summary}</p>
+                    <p className="text-xs text-muted-foreground mt-2">{result.summary}</p>
                   </div>
 
                   {/* Categories */}
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-2 gap-2">
                     {[
                       { label: "Bugs", cat: result.bugs, icon: AlertTriangle, color: "var(--accent-danger)" },
                       { label: "Security", cat: result.security, icon: Shield, color: "var(--accent-warning)" },
                       { label: "Performance", cat: result.performance, icon: Zap, color: "var(--accent-info)" },
                       { label: "Best Practices", cat: result.bestPractices, icon: Lightbulb, color: "var(--accent-success)" },
                     ].map((c) => (
-                      <div key={c.label} className="rounded-xl border bg-card p-4 shadow-[var(--shadow-card)]">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                            <c.icon className="w-3.5 h-3.5" /> {c.label}
+                      <div key={c.label} className="rounded-lg border bg-card p-3 shadow-[var(--shadow-card)]">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground">
+                            <c.icon className="w-3 h-3" /> {c.label}
                           </span>
-                          <span className="text-sm font-bold" style={{ color: c.color }}>{Math.round(c.cat.score)}</span>
+                          <span className="text-xs font-bold" style={{ color: c.color }}>{Math.round(c.cat.score)}</span>
                         </div>
-                        <div className="space-y-1">
+                        <div className="space-y-0.5">
                           {c.cat.issues.slice(0, 3).map((issue, i) => (
-                            <p key={i} className="text-xs text-muted-foreground line-clamp-2">{issue}</p>
+                            <p key={i} className="text-[11px] text-muted-foreground line-clamp-2">{issue}</p>
                           ))}
                         </div>
                       </div>

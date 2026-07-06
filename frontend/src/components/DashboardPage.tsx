@@ -226,7 +226,10 @@ export default function DashboardPage() {
                   <div className="rounded-2xl border bg-card p-5 shadow-[var(--shadow-elegant)]">
                     <div className="flex items-center justify-between mb-3">
                       <span className="text-sm font-medium">Overall score</span>
-                      <span className="text-2xl font-display font-bold" style={{ color: scoreColor }}>{Math.round(result.overallScore)}<span className="text-sm text-muted-foreground font-normal">/100</span></span>
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-2xl font-display font-bold" style={{ color: scoreColor }}>{Math.round(result.overallScore)}</span>
+                        <span className="text-sm text-muted-foreground font-normal">/100</span>
+                      </div>
                     </div>
                     <div className="w-full h-2 rounded-full bg-muted overflow-hidden">
                       <div className="h-full rounded-full transition-all duration-700" style={{ width: `${result.overallScore}%`, background: scoreColor }} />

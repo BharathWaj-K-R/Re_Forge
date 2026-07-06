@@ -195,7 +195,7 @@ export default function HistoryPage() {
                           color: scoreColor(r.overall_score),
                         }}
                       >
-                        {r.overall_score}
+                        {Math.round(r.overall_score)}
                       </div>
                       <div>
                         <div className="font-medium capitalize">{r.language}</div>

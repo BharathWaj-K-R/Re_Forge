@@ -226,7 +226,7 @@ export default function DashboardPage() {
                   <div className="rounded-2xl border bg-card p-5 shadow-[var(--shadow-elegant)]">
                     <div className="flex items-center justify-between mb-3">
                       <span className="text-sm font-medium">Overall score</span>
-                      <span className="text-2xl font-display font-bold" style={{ color: scoreColor }}>{result.overallScore}<span className="text-sm text-muted-foreground font-normal">/100</span></span>
+                      <span className="text-2xl font-display font-bold" style={{ color: scoreColor }}>{Math.round(result.overallScore)}<span className="text-sm text-muted-foreground font-normal">/100</span></span>
                     </div>
                     <div className="w-full h-2 rounded-full bg-muted overflow-hidden">
                       <div className="h-full rounded-full transition-all duration-700" style={{ width: `${result.overallScore}%`, background: scoreColor }} />
@@ -247,7 +247,7 @@ export default function DashboardPage() {
                           <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
                             <c.icon className="w-3.5 h-3.5" /> {c.label}
                           </span>
-                          <span className="text-sm font-bold" style={{ color: c.color }}>{c.cat.score}</span>
+                          <span className="text-sm font-bold" style={{ color: c.color }}>{Math.round(c.cat.score)}</span>
                         </div>
                         <div className="space-y-1">
                           {c.cat.issues.slice(0, 3).map((issue, i) => (

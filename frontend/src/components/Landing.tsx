@@ -140,7 +140,7 @@ function ScoreRing({ score }: { score: number }) {
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <div className="text-3xl font-display font-semibold text-gradient">{pct}</div>
+        <div className="text-3xl font-display font-semibold text-gradient">{Math.round(pct)}</div>
         <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Score</div>
       </div>
     </div>
@@ -157,7 +157,7 @@ function CategoryCard({ icon: Icon, label, cat, tint }: { icon: any; label: stri
           </div>
           <div className="font-medium">{label}</div>
         </div>
-        <div className="font-mono text-sm px-2 py-1 rounded-md bg-muted">{cat.score}</div>
+        <div className="font-mono text-sm px-2 py-1 rounded-md bg-muted">{Math.round(cat.score)}</div>
       </div>
       <ul className="space-y-1.5">
         {cat.issues.slice(0, 3).map((i, idx) => (

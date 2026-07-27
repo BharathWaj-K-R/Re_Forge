@@ -42,28 +42,19 @@ Empty strings are excluded from the CORS allow-list automatically.
 
 ---
 
-## Frontend Variables
+## Frontend Configuration
 
-Set these in the Render dashboard under the Static Site's **Environment** tab, or in a `.env` file inside `frontend/` for local development.
+The static frontend does not require Render environment variables or Vite build-time variables.
 
-### Build-Time Variables
+Configure the backend URL in `frontend/js/config.js`:
 
-These are embedded into the JavaScript bundle during `vite build`. Changing them requires a rebuild.
+```js
+window.REFORGE_CONFIG = {
+  API_URL: "https://reforge-api.onrender.com",
+};
+```
 
-| Variable | Example | Description |
-|---|---|---|
-| `VITE_API_URL` | `https://reforge-api.onrender.com` | Backend API base URL. No trailing slash. |
-
-**Behavior:**
-
-| `VITE_API_URL` value | Frontend behavior |
-|---|---|
-| Set to valid URL | Sends real API calls to backend |
-| Not set / empty | Runs in offline demo mode with heuristic analysis |
-
-> **Important:** If you change `VITE_API_URL` after the initial build, you must trigger a manual redeploy of the Static Site. The value is baked into the JS at build time and cannot be changed at runtime.
-
----
+For local development against a local backend, temporarily set `API_URL` to `http://localhost:8000`.
 
 ## Local Development Setup
 
@@ -74,13 +65,15 @@ GROQ_API_KEY=gsk_your_key_here
 LOG_LEVEL=DEBUG
 ```
 
-### Frontend (.env inside frontend/)
+### Frontend (`frontend/js/config.js`)
 
-```env
-VITE_API_URL=http://localhost:8000
+```js
+window.REFORGE_CONFIG = {
+  API_URL: "http://localhost:8000",
+};
 ```
 
-For local development, point `VITE_API_URL` at your local backend (`http://localhost:8000`). The backend's CORS config already includes `http://localhost:5173` (Vite dev server port).
+The backend CORS config already includes `http://localhost:5173` for local static serving.
 
 ---
 
@@ -94,8 +87,8 @@ For local development, point `VITE_API_URL` at your local backend (`http://local
 
 ### Frontend Static Site
 
-- [ ] `VITE_API_URL` set to backend URL (no trailing slash)
-- [ ] Redeployed after any env var change
+- [ ] `frontend/js/config.js` points to the correct backend URL
+- [ ] Backend `NEW_FRONTEND_URL` matches the deployed frontend origin
 
 ---
 

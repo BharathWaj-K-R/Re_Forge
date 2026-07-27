@@ -5,7 +5,7 @@
 ReForge is a two-service platform deployed on Render:
 
 - **Backend** — FastAPI Web Service hosting the AI review pipeline
-- **Frontend** — Static Site (Vite + React) serving the web UI
+- **Frontend** — Static Site serving plain HTML, CSS, and vanilla JavaScript
 
 Both services are independent and can be deployed, scaled, and updated separately.
 
@@ -16,10 +16,10 @@ Both services are independent and can be deployed, scaled, and updated separatel
 │  ┌────────────────────────┐       ┌───────────────────────────┐ │
 │  │  Backend Web Service    │       │  Frontend Static Site      │ │
 │  │                        │       │                           │ │
-│  │  FastAPI + Uvicorn      │  HTTPS│  Vite 8 + React 19       │ │
-│  │  Groq Llama 3.3 70B    │◄─────│  Tailwind CSS v4          │ │
-│  │                        │       │  Three.js + shadcn/ui     │ │
-│  │  /review  /health  /   │       │  VITE_API_URL (build)     │ │
+│  │  FastAPI + Uvicorn      │  HTTPS│  HTML + CSS + JS         │ │
+│  │  Groq Llama 3.3 70B    │◄─────│  No framework build       │ │
+│  │                        │       │  Runtime API config       │ │
+│  │  /review  /health  /   │       │  js/config.js             │ │
 │  └────────────────────────┘       └───────────────────────────┘ │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -135,44 +135,47 @@ Code + Language
 
 ### Technology
 
-- **Vite 8** — Build tool and dev server
-- **React 19** — UI framework
-- **TypeScript** — Type safety
-- **Tailwind CSS v4** — Styling with custom design tokens
-- **Three.js** — 3D hero orb and floating cards animations
-- **shadcn/ui** — Radix-based component primitives
+- **HTML** — Static document structure and app sections
+- **CSS** — Plain responsive styling and design tokens
+- **Vanilla JavaScript** — API calls, auth state, hash navigation, and rendering
+- **Optional npm script** — Copy-only build script for Render compatibility; no React/Vite compilation
 
-### Component Structure
+### File Structure
 
-```
-main.tsx
-  └── Routes:
-      ├── Landing.tsx (public page)
-      │     ├── HeroOrb.tsx (Three.js 3D sphere)
-      │     ├── MiniCards.tsx (Three.js floating cards)
-      │     └── UI Sections: Nav, Hero, Demo, Features, How, Footer
-      ├── DashboardPage.tsx (authenticated review dashboard)
-      ├── AuthPage.tsx (login/register)
-      └── HistoryPage.tsx (review history + detail modal)
+```text
+frontend/
+  index.html              # Static app shell
+  css/styles.css          # Plain CSS UI
+  js/config.js            # Backend API URL
+  js/api.js               # Fetch wrapper and auth headers
+  js/auth.js              # Auth/session helpers
+  js/review.js            # Review submission and result rendering
+  js/history.js           # History/account API helpers
+  js/app.js               # Event wiring and hash navigation
+  assets/reforgelogo.png  # Logo asset
 ```
 
 ### API Integration
 
-The frontend reads `VITE_API_URL` at build time:
+The frontend reads the backend API URL at runtime from `frontend/js/config.js`:
 
-- If set → sends `POST /review` to the backend
-- If not set → runs in offline demo mode with heuristic analysis
-- On API failure → shows error message + falls back to local analysis
-
-### Response Transformation
-
-The backend returns findings as arrays. The frontend transforms these into per-category scores for display:
-
+```js
+window.REFORGE_CONFIG = {
+  API_URL: "https://reforge-api.onrender.com",
+};
 ```
-Backend: { reviews: { bug: [{severity: "High", ...}] } }
+
+All API calls use the existing backend routes. Authenticated calls include `Authorization: Bearer <token>` from the `reforge_session` localStorage entry.
+
+### Response Rendering
+
+The backend returns findings as arrays grouped by category. The static frontend renders the overall score, summary, and four finding categories directly from that response:
+
+```text
+Backend: { reviews: { bug: [{ severity: "High", ... }] } }
                 │
                 ▼
-Frontend: { bugs: { score: 80, issues: ["..."] } }
+Frontend: score panel + bug/security/performance/best-practice cards
 ```
 
 ## Data Flow

@@ -1,21 +1,19 @@
 # ReForge Deployment Guide
 
-ReForge uses a two-service architecture on Render:
+ReForge uses two independent Render services:
 
 | Service | Type | Root Directory | Purpose |
 |---|---|---|---|
-| `reforge-api` | Web Service | `/` (repo root) | Backend API |
-| `reforge-frontend` | Static Site | `frontend/` | Frontend UI |
+| `reforge-api` | Web Service | `/` (repo root) | Python/FastAPI backend API |
+| `reforge-frontend` | Static Site | `frontend/` | Static HTML/CSS/JavaScript UI |
 
-Both services are independent and deploy separately.
+The backend and frontend deploy separately. The backend deployment contract is unchanged.
 
 ---
 
-## Backend (Web Service)
+## Backend Web Service
 
-### Automatic Deployment via render.yaml
-
-The backend is defined as Infrastructure as Code in `render.yaml`:
+The backend is defined in `render.yaml`:
 
 ```yaml
 services:
@@ -27,120 +25,72 @@ services:
     healthCheckPath: /health
 ```
 
-### Setup Steps
+Required Render environment variables:
 
-1. **Connect your GitHub repo** to Render
-2. Render auto-detects `render.yaml` and creates the Web Service
-3. Set environment variables in the Render dashboard (see [ENVIRONMENT.md](ENVIRONMENT.md))
-4. Click **Deploy**
-
-### Manual Configuration
-
-If not using `render.yaml`, configure manually:
-
-| Setting | Value |
-|---|---|
-| **Name** | `reforge-api` |
-| **Type** | Web Service |
-| **Environment** | Python 3 |
-| **Build Command** | `pip install -r requirements.txt` |
-| **Start Command** | `uvicorn backend.main:app --host 0.0.0.0 --port $PORT` |
-| **Health Check Path** | `/health` |
-
-### Required Environment Variables
-
-| Key | Required | Example |
+| Key | Required | Notes |
 |---|---|---|
-| `GROQ_API_KEY` | Yes | `gsk_...` |
-| `NEW_FRONTEND_URL` | Recommended | `https://reforge-frontend.onrender.com` |
-| `AGENT_TIMEOUT_SECONDS` | Optional | `25` (default) |
-| `LOG_LEVEL` | Optional | `INFO` (default) |
-
-See [ENVIRONMENT.md](ENVIRONMENT.md) for full details.
+| `GROQ_API_KEY` | Yes | Groq API key for LLM reviews |
+| `NEW_FRONTEND_URL` | Recommended | Exact frontend origin for CORS |
+| `DATABASE_URL` | Production recommended | PostgreSQL connection string |
+| `JWT_SECRET` | Production required | Strong JWT signing secret |
+| `AGENT_TIMEOUT_SECONDS` | Optional | Defaults to backend config |
+| `LOG_LEVEL` | Optional | Defaults to backend config |
 
 ---
 
-## Frontend (Static Site)
+## Frontend Static Site
 
-### Setup Steps
+The frontend now uses plain static files in `frontend/`.
 
-1. In Render dashboard: **New** → **Static Site**
-2. Connect the same GitHub repo (`Re_Forge`)
-3. Configure with these settings:
+### Option A: Keep existing Render build settings
+
+Use this if your Render Static Site is already configured like the old Vite app:
 
 | Setting | Value |
 |---|---|
-| **Name** | `reforge-frontend` |
-| **Root Directory** | `frontend` |
-| **Build Command** | `npm install && npm run build` |
-| **Publish Directory** | `dist` |
-| **Branch** | `main` |
+| Root Directory | `frontend` |
+| Build Command | `npm install && npm run build` |
+| Publish Directory | `dist` |
 
-4. Add environment variable:
+The current `npm run build` script does not compile React or Vite. It only copies `index.html`, `css/`, `js/`, and `assets/` into `dist/`.
 
-| Key | Value |
+### Option B: Simplify to no-build static hosting
+
+Use this after confirming the static frontend works:
+
+| Setting | Value |
 |---|---|
-| `VITE_API_URL` | `https://reforge-api.onrender.com` |
+| Root Directory | `frontend` |
+| Build Command | `echo "No build needed"` |
+| Publish Directory | `.` |
 
-> **Important:** `VITE_API_URL` is embedded at build time. If you change it, you must redeploy the Static Site (Manual Deploy → Deploy latest commit).
+---
 
-5. Click **Create Static Site**
+## Local frontend testing
 
-### Post-Deployment: Update Backend CORS
+```bash
+cd frontend
+python3 -m http.server 5173
+```
+
+Open <http://localhost:5173>.
+
+The backend CORS configuration already allows `http://localhost:5173`. Do not use `file://` to open the page because browser CORS behavior may block API calls.
+
+---
+
+## CORS after deployment
 
 After the frontend is live:
 
-1. Copy the Static Site URL (e.g., `https://reforge-frontend.onrender.com`)
-2. Go to the backend Web Service → **Environment**
-3. Set `NEW_FRONTEND_URL` to that URL
-4. Save → backend redeploys automatically
+1. Copy the frontend Static Site URL, for example `https://re-forge.onrender.com`.
+2. Open the backend Web Service in Render.
+3. Set `NEW_FRONTEND_URL` to that exact origin.
+4. Redeploy the backend if Render does not do it automatically.
 
 ---
 
-## Deployment Architecture
-
-```
-                    ┌─────────────────────┐
-                    │   GitHub Repository  │
-                    │   BharathWaj-K-R/   │
-                    │   Re_Forge           │
-                    └──────────┬──────────┘
-                               │
-                    ┌──────────┴──────────┐
-                    │   Render Auto-Deploy │
-                    └──────────┬──────────┘
-                               │
-              ┌────────────────┴────────────────┐
-              │                                  │
-    ┌─────────▼─────────┐           ┌───────────▼───────────┐
-    │  Web Service       │           │  Static Site           │
-    │  reforge-api       │           │  reforge-frontend      │
-    │                    │           │                        │
-    │  Python / FastAPI   │           │  Node / Vite build     │
-    │  uvicorn start     │           │  dist/ published       │
-    │                    │           │                        │
-    │  Env: GROQ_API_KEY │           │  Env: VITE_API_URL     │
-    │       NEW_FRONTEND │           │       → baked into JS  │
-    └────────────────────┘           └────────────────────────┘
-```
-
----
-
-## Redeployment
-
-### Backend
-- Push to `main` → auto-deploys
-- Or: Render dashboard → **Manual Deploy** → **Deploy latest commit**
-
-### Frontend
-- Push to `main` → auto-deploys (if Static Site is connected)
-- If you change `VITE_API_URL`: must trigger manual redeploy after saving the env var
-
----
-
-## Monitoring
-
-### Health Check
+## Health check
 
 ```bash
 curl https://reforge-api.onrender.com/health
@@ -152,26 +102,13 @@ Expected response:
 { "status": "healthy", "service": "ReForge API", "version": "1.0.0" }
 ```
 
-### Logs
-
-View in Render dashboard under each service's **Logs** tab. Key log messages:
-
-| Log Pattern | Meaning |
-|---|---|
-| `Review request for language=...` | Review request received |
-| `Starting agentic review` | Agentic pipeline started |
-| `Agentic review complete: llm_calls=N score=XX` | Agentic review finished |
-| `Agentic pipeline timed out` | Returned failure envelope |
-| `Agentic pipeline failed` | Returned failure envelope |
-
 ---
 
 ## Troubleshooting
 
 | Problem | Cause | Fix |
 |---|---|---|
-| Frontend shows "Live API failed" | CORS not configured | Set `NEW_FRONTEND_URL` in backend env |
-| Frontend shows "offline demo mode" | `VITE_API_URL` not set | Set env var and redeploy Static Site |
-| Backend returns 500 | Groq API key missing | Set `GROQ_API_KEY` in backend env |
-| Build fails on Static Site | Wrong root directory | Set Root Directory to `frontend` |
-| CORS errors in browser console | Frontend URL not in allow-list | Add URL to `NEW_FRONTEND_URL` |
+| Frontend API calls fail with CORS errors | Frontend origin not allowed | Set backend `NEW_FRONTEND_URL` to the frontend origin |
+| Backend returns 500 | Missing or invalid backend env vars | Check `GROQ_API_KEY`, `DATABASE_URL`, and logs |
+| Static Site build fails | Wrong root/build settings | Use `frontend`, `npm install && npm run build`, and `dist` |
+| Frontend points to wrong backend | `frontend/js/config.js` has wrong `API_URL` | Update `API_URL` and redeploy |

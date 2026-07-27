@@ -18,9 +18,9 @@ Set these in the Render dashboard under the Web Service's **Environment** tab, o
 
 | Variable | Default | Example | Description |
 |---|---|---|---|
-| `NEW_FRONTEND_URL` | `""` | `https://reforge-frontend.onrender.com` | Frontend URL for CORS allow-list |
+| `NEW_FRONTEND_URL` | `""` | `https://re-forge.onrender.com,https://reforge-preview.onrender.com` | Frontend origin(s) for the CORS allow-list. Accepts a single origin or a comma-separated list. |
 
-Empty strings are excluded from the CORS allow-list automatically.
+Empty strings are excluded from the CORS allow-list automatically. Whatever origin the frontend is actually served from (check the browser address bar) must be listed here **exactly** (scheme + host, no trailing slash) or every API request from that frontend will fail with a CORS error, which browsers surface to JavaScript as a generic "Failed to fetch".
 
 ### Pipeline Configuration
 

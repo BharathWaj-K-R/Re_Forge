@@ -39,6 +39,7 @@
 
     views.forEach((view) => view.classList.toggle("active", view.id === target));
     if (target === "history") refreshHistory();
+    if (target === "auth") setAuthStep("login");
     updateNav();
   }
 
@@ -70,17 +71,36 @@
     }
   }
 
+  let pendingEmail = "";
+
+  function setAuthStep(step) {
+    document.querySelectorAll("[data-auth-step]").forEach((el) => {
+      el.classList.toggle("hidden", el.dataset.authStep !== step);
+    });
+    document.querySelectorAll("[data-auth-tab]").forEach((tab) => {
+      const active = tab.dataset.authTab === step;
+      tab.classList.toggle("active", active);
+      tab.setAttribute("aria-selected", String(active));
+    });
+    setMessage($("[data-auth-message]"), "", "");
+    const verifyDisplay = $("[data-verify-email-display]");
+    if (verifyDisplay) verifyDisplay.textContent = pendingEmail || "your email";
+    const resetDisplay = $("[data-reset-email-display]");
+    if (resetDisplay) resetDisplay.textContent = pendingEmail || "your email";
+  }
+
   async function handleAuthSubmit(event) {
     event.preventDefault();
     const form = event.currentTarget;
     const type = form.dataset.authForm;
     const data = Object.fromEntries(new FormData(form).entries());
+    if (["verify", "reset"].includes(type)) data.email = pendingEmail;
+    if (["register", "forgot"].includes(type)) pendingEmail = data.email;
     const message = $("[data-auth-message]");
     const actions = {
       register: window.ReForgeAuth.register,
       login: window.ReForgeAuth.login,
       verify: window.ReForgeAuth.verifyOtp,
-      resend: window.ReForgeAuth.resendOtp,
       forgot: window.ReForgeAuth.forgotPassword,
       reset: window.ReForgeAuth.resetPassword,
     };
@@ -91,11 +111,32 @@
       const response = await actions[type](data);
       setMessage(message, response.message || "Success.", "success");
       updateNav();
-      if (["login", "verify"].includes(type)) window.location.hash = "dashboard";
+      if (["login", "verify"].includes(type)) {
+        window.location.hash = "dashboard";
+      } else if (type === "register") {
+        setAuthStep("verify");
+      } else if (type === "forgot") {
+        setAuthStep("reset");
+      }
     } catch (error) {
       setMessage(message, error.message, "error");
     } finally {
       setBusy(form, false);
+    }
+  }
+
+  async function handleResendOtp() {
+    const message = $("[data-auth-message]");
+    if (!pendingEmail) {
+      setMessage(message, "Enter your email on the create account step first.", "error");
+      return;
+    }
+    setMessage(message, "Sending a new code...", "");
+    try {
+      const response = await window.ReForgeAuth.resendOtp({ email: pendingEmail });
+      setMessage(message, response.message || "Code sent.", "success");
+    } catch (error) {
+      setMessage(message, error.message, "error");
     }
   }
 
@@ -135,6 +176,10 @@
   function setupEvents() {
     document.querySelectorAll("[data-review-form]").forEach((form) => form.addEventListener("submit", handleReviewSubmit));
     document.querySelectorAll("[data-auth-form]").forEach((form) => form.addEventListener("submit", handleAuthSubmit));
+    document.querySelectorAll("[data-auth-tab]").forEach((tab) => tab.addEventListener("click", () => setAuthStep(tab.dataset.authTab)));
+    document.querySelectorAll("[data-goto-step]").forEach((btn) => btn.addEventListener("click", () => setAuthStep(btn.dataset.gotoStep)));
+    const resendBtn = $("[data-resend-otp]");
+    if (resendBtn) resendBtn.addEventListener("click", handleResendOtp);
     document.querySelectorAll("[data-logout]").forEach((button) => button.addEventListener("click", () => {
       window.ReForgeAuth.logout();
       updateNav();

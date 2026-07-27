@@ -3,13 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="ReForge AI-powered code review platform" />
-    <title>ReForge | AI Code Review</title>
+    <meta name="description" content="ReForge — AI-powered code review with a deterministic scoring engine." />
+    <title>ReForge | Code Review</title>
     <link rel="icon" href="assets/reforgelogo.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="stylesheet" href="css/styles.css" />
     <script src="js/config.js" defer></script>
     <script src="js/api.js" defer></script>
     <script src="js/auth.js" defer></script>
+    <script src="js/gauge.js" defer></script>
     <script src="js/review.js" defer></script>
     <script src="js/history.js" defer></script>
     <script src="js/app.js" defer></script>
@@ -29,31 +31,60 @@
           <button class="link-button hidden" type="button" data-logout>Logout</button>
         </nav>
       </header>
+      <div class="ruler" aria-hidden="true"></div>
 
       <main>
         <section id="home" class="view active">
           <div class="hero-grid">
             <div class="hero-copy">
-              <p class="eyebrow">Multi-agent AI code review</p>
-              <h1>Review code for bugs, security, performance, and best practices.</h1>
+              <p class="eyebrow">Multi-agent review pipeline</p>
+              <h1>Raw code in.<br /><span class="accent">Tempered</span> code out.</h1>
               <p class="hero-text">
-                Paste code, choose a language, and get structured feedback from ReForge without changing the existing Python backend.
+                Paste code and pick a language. Specialist agents inspect it for bugs, security
+                gaps, performance issues, and style — a critic agent clears out the noise, and a
+                deterministic engine sets the score. Same findings, same score, every run.
               </p>
               <div class="hero-actions">
-                <a class="button primary" href="#review-demo">Try anonymous review</a>
-                <a class="button secondary" href="#auth" data-guest-link>Sign in</a>
+                <a class="button primary" href="#review-demo">Run a free review</a>
+                <a class="button secondary" href="#auth" data-guest-link>Sign in to save history</a>
               </div>
             </div>
-            <div class="hero-card">
-              <span class="score-ring">100</span>
-              <h2>Deterministic scoring</h2>
-              <p>Validated findings are scored consistently by severity.</p>
+            <div class="hero-card panel" data-hero-gauge>
+              <!-- Temper gauge is rendered here by js/gauge.js -->
+            </div>
+          </div>
+
+          <div class="pipeline-rail" aria-label="Review pipeline stages">
+            <div class="pipeline-step">
+              <span class="step-index">01</span>
+              <span class="step-name">Plan</span>
+              <span class="step-detail">Reads the code and decides which specialists are worth running.</span>
+            </div>
+            <div class="pipeline-step">
+              <span class="step-index">02</span>
+              <span class="step-name">Inspect</span>
+              <span class="step-detail">Bug, security, performance, and style agents run in parallel with tool assists.</span>
+            </div>
+            <div class="pipeline-step">
+              <span class="step-index">03</span>
+              <span class="step-name">Verify</span>
+              <span class="step-detail">Deterministic checks confirm or reject each raw finding.</span>
+            </div>
+            <div class="pipeline-step">
+              <span class="step-index">04</span>
+              <span class="step-name">Critique</span>
+              <span class="step-detail">Duplicate and low-confidence findings are filtered out.</span>
+            </div>
+            <div class="pipeline-step">
+              <span class="step-index">05</span>
+              <span class="step-name">Score</span>
+              <span class="step-detail">A fixed formula converts findings to a score. The model never grades itself.</span>
             </div>
           </div>
 
           <section id="review-demo" class="panel">
             <div class="section-heading">
-              <p class="eyebrow">Public demo</p>
+              <p class="eyebrow">Open bench</p>
               <h2>Run an anonymous review</h2>
             </div>
             <form class="review-form" data-review-form="anonymous">
@@ -81,6 +112,10 @@
         </section>
 
         <section id="auth" class="view">
+          <div class="section-heading">
+            <p class="eyebrow">Account</p>
+            <h2>Sign in or create an account</h2>
+          </div>
           <div class="auth-grid">
             <article class="panel">
               <h2>Sign in</h2>
@@ -100,7 +135,7 @@
               </form>
             </article>
             <article class="panel">
-              <h2>Verify OTP</h2>
+              <h2>Verify email</h2>
               <form class="stack" data-auth-form="verify">
                 <input name="email" type="email" placeholder="Email" required />
                 <input name="otp" type="text" inputmode="numeric" placeholder="6-digit code" required />
@@ -108,7 +143,7 @@
               </form>
               <form class="inline-form" data-auth-form="resend">
                 <input name="email" type="email" placeholder="Email" required />
-                <button class="button secondary" type="submit">Resend OTP</button>
+                <button class="button secondary" type="submit">Resend code</button>
               </form>
             </article>
             <article class="panel">
@@ -130,11 +165,11 @@
 
         <section id="dashboard" class="view">
           <div class="section-heading">
-            <p class="eyebrow">Authenticated workspace</p>
-            <h2>Dashboard review</h2>
-            <p data-user-greeting></p>
+            <p class="eyebrow">Authenticated workbench</p>
+            <h2>Review and save</h2>
+            <p class="muted" data-user-greeting></p>
           </div>
-          <div class="panel auth-required">
+          <div class="panel">
             <form class="review-form" data-review-form="dashboard">
               <label>
                 Language
@@ -162,19 +197,19 @@ console.log(token);</textarea>
         <section id="history" class="view">
           <div class="section-heading row-heading">
             <div>
-              <p class="eyebrow">Saved reviews</p>
-              <h2>History</h2>
+              <p class="eyebrow">Work orders</p>
+              <h2>Review history</h2>
             </div>
             <div class="button-row">
               <button class="button secondary" type="button" data-load-history>Refresh</button>
               <button class="button danger" type="button" data-clear-history>Clear history</button>
-              <button class="button danger ghost" type="button" data-delete-account>Delete account</button>
+              <button class="button ghost" type="button" data-delete-account>Delete account</button>
             </div>
           </div>
           <div class="message" data-history-message></div>
           <div class="history-layout">
             <div class="panel"><div data-history-list></div></div>
-            <div class="panel"><div data-history-detail>Select a review to view details.</div></div>
+            <div class="panel"><div data-history-detail class="muted">Select a review to view details.</div></div>
           </div>
         </section>
       </main>

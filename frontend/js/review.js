@@ -44,7 +44,7 @@
     const categories = ["bug", "security", "performance", "best_practice"];
     container.innerHTML = `
       <section class="panel result-summary">
-        <div class="result-score">${escapeHtml(result.overall_score ?? "--")}</div>
+        <div data-result-gauge></div>
         <div>
           <p class="eyebrow">${result.success ? "Review complete" : "Review returned"}</p>
           <h2>${escapeHtml(result.summary || "No summary returned.")}</h2>
@@ -60,6 +60,11 @@
         `).join("")}
       </section>
     `;
+
+    const gaugeMount = container.querySelector("[data-result-gauge]");
+    if (gaugeMount && window.ReForgeGauge) {
+      window.ReForgeGauge.renderGauge(gaugeMount, Number(result.overall_score) || 0);
+    }
   }
 
   window.ReForgeReview = { submitReview, renderReviewResult, escapeHtml };

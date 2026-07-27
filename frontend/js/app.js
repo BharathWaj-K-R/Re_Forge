@@ -167,7 +167,18 @@
     window.addEventListener("hashchange", () => showView(window.location.hash.slice(1)));
   }
 
+  function renderHeroGauge() {
+    const mount = $("[data-hero-gauge]");
+    if (!mount || !window.ReForgeGauge) return;
+    window.ReForgeGauge.renderGauge(mount, 92);
+    const caption = document.createElement("p");
+    caption.className = "hero-card-caption";
+    caption.textContent = "Every finding is validated before it changes the score.";
+    mount.appendChild(caption);
+  }
+
   setupEvents();
   updateNav();
   showView(window.location.hash.slice(1) || "home");
+  renderHeroGauge();
 })();

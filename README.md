@@ -2,8 +2,7 @@
   <img src="https://img.shields.io/badge/python-3.10%2B-blue" alt="Python 3.10+" />
   <img src="https://img.shields.io/badge/FastAPI-0.115-009688" alt="FastAPI" />
   <img src="https://img.shields.io/badge/Groq-Llama%203.3%2070B-orange" alt="Groq AI" />
-  <img src="https://img.shields.io/badge/React-19-61DAFB" alt="React 19" />
-  <img src="https://img.shields.io/badge/Vite-8-646CFF" alt="Vite 8" />
+  <img src="https://img.shields.io/badge/frontend-HTML%2FCSS%2FJS-46E3B0" alt="HTML CSS JavaScript frontend" />
   <img src="https://img.shields.io/badge/deployed-Render-46E3B0" alt="Deployed on Render" />
   <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT License" />
   <a href="https://re-forge.onrender.com/">
@@ -27,8 +26,8 @@ ReForge analyzes source code using large language models and returns structured 
 - **Deterministic scoring** — Same findings always produce the same score, independent of model self-assessment
 - **4 review categories** — Bugs, Security, Performance, Best Practices
 - **Graceful degradation** — Timeout returns honest failure envelope; frontend falls back to mock analysis
-- **Dual frontend support** — Old and new frontends run side-by-side on the same backend
-- **Modern UI** — Glass-morphism design, Three.js 3D animations, responsive layout
+- **Clean static frontend** — Plain HTML, CSS, and vanilla JavaScript without React/Vite build dependencies
+- **Modern UI** — Glass-morphism design and responsive layout
 - **Production-ready** — Deployed on Render with health checks, CORS, and IaC configuration
 
 ---
@@ -61,7 +60,7 @@ Two independent services on Render:
 | Service | Type | Tech |
 |---|---|---|
 | **Backend** | Web Service | FastAPI + Groq Llama 3.3 70B |
-| **Frontend** | Static Site | Vite 8 + React 19 + Tailwind v4 + Three.js |
+| **Frontend** | Static Site | HTML + CSS + vanilla JavaScript |
 
 See [Architecture Docs](docs/ARCHITECTURE.md) for the full system design.
 
@@ -72,7 +71,7 @@ See [Architecture Docs](docs/ARCHITECTURE.md) for the full system design.
 ### Prerequisites
 
 - Python 3.10+
-- Node.js 18+
+- Node.js 18+ only if using the optional Render-compatible `npm run build` copy script
 - [Groq API key](https://console.groq.com)
 
 ### 1. Clone
@@ -104,12 +103,8 @@ Backend runs at [http://localhost:8000](http://localhost:8000). API docs at [htt
 ```bash
 cd frontend
 
-npm install
-
-# Create .env inside frontend/
-echo VITE_API_URL=http://localhost:8000 > .env
-
-npm run dev
+# Optional: edit js/config.js if your backend is not https://reforge-api.onrender.com
+python3 -m http.server 5173
 ```
 
 Frontend runs at [http://localhost:5173](http://localhost:5173).
@@ -177,10 +172,8 @@ Starting score: **100** | Floor: **0**
 |---|---|
 | **Backend** | Python 3, FastAPI, Pydantic, Uvicorn |
 | **AI** | Groq API, Llama 3.3 70B Versatile |
-| **Frontend** | React 19, TypeScript, Vite 8 |
-| **Styling** | Tailwind CSS v4, custom design tokens |
-| **3D Graphics** | Three.js (HeroOrb, MiniCards) |
-| **UI Components** | shadcn/ui (Radix primitives) |
+| **Frontend** | HTML, CSS, vanilla JavaScript |
+| **Styling** | Plain CSS custom design tokens |
 | **Deployment** | Render (Web Service + Static Site) |
 | **IaC** | render.yaml |
 
@@ -202,19 +195,13 @@ Re_Forge/
 │       ├── score.py              # Deterministic scoring
 │       └── tools.py              # AST, secrets, loop tools
 │
-├── frontend/                     # Frontend
-│   ├── src/
-│   │   ├── main.tsx              # Entry point
-│   │   ├── styles.css            # Tailwind theme
-│   │   ├── components/
-│   │   │   ├── Landing.tsx       # Main page
-│   │   │   ├── HeroOrb.tsx       # 3D orb
-│   │   │   ├── MiniCards.tsx     # 3D cards
-│   │   │   └── ui/              # shadcn/ui components
-│   │   ├── hooks/
-│   │   └── lib/
-│   ├── package.json
-│   └── vite.config.ts
+├── frontend/                     # Static frontend
+│   ├── index.html                # HTML shell and app sections
+│   ├── css/styles.css            # Plain CSS styles
+│   ├── js/                       # Vanilla JavaScript modules
+│   ├── assets/reforgelogo.png    # Logo asset
+│   ├── package.json              # Optional copy-only Render build script
+│   └── README.md                 # Frontend deployment notes
 │
 ├── docs/                         # Documentation
 │   ├── ARCHITECTURE.md
@@ -236,7 +223,7 @@ Re_Forge/
 ReForge deploys on Render as two independent services:
 
 1. **Backend Web Service** — auto-deploys from `render.yaml`
-2. **Frontend Static Site** — configured in Render dashboard
+2. **Frontend Static Site** — configured in Render dashboard from `frontend/`
 
 See [Deployment Guide](docs/DEPLOYMENT.md) for step-by-step instructions.
 

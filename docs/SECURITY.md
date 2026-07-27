@@ -4,14 +4,14 @@
 
 | Category | Status | Severity |
 |---|---|---|
-| Authentication | Not implemented | HIGH |
+| Authentication | JWT + verified email for saved user flows | MEDIUM |
 | Rate Limiting | Not implemented | HIGH |
 | CORS | Configured with allow-list | LOW risk |
 | Input Validation | Pydantic schema validation | MEDIUM (no size limits) |
 | Secrets Management | Env vars, gitignored | LOW risk |
-| XSS | Mitigated (React auto-escaping) | LOW risk |
+| XSS | Mitigated with explicit HTML escaping in static render helpers | LOW risk |
 | CSRF | Not applicable (no cookie auth) | N/A |
-| SQL Injection | Not applicable (no database) | N/A |
+| SQL Injection | SQLAlchemy ORM queries | LOW risk |
 | Dependency Vulnerabilities | No known CVEs at time of audit | LOW risk |
 
 ---
@@ -23,18 +23,16 @@
 - **CORS**: Only explicitly allowed origins can access the API
 - **Input validation**: Pydantic rejects malformed requests (422)
 - **Secrets**: API keys stored in env vars, never committed to git
-- **XSS**: React's JSX auto-escapes all rendered content
+- **XSS**: Static rendering helpers escape backend-provided finding content before injecting HTML
 - **JSON parsing**: LLM output is validated and normalized before use
 
 ### What's Not Protected
 
-#### 1. No Authentication (HIGH)
+#### 1. Public Review and Test Endpoints (MEDIUM)
 
-All endpoints are publicly accessible. Anyone with the API URL can:
-- Submit code for review (consuming Groq API credits)
-- Access the `/test-ai` debug endpoint
+Anonymous users can submit code to `/review`, and `/test-ai` calls the LLM directly. These are useful for demos, but they can consume Groq API credits.
 
-**Recommendation:** Add API key authentication or use Render's built-in auth.
+**Recommendation:** Add rate limiting and consider protecting `/test-ai` in production.
 
 #### 2. No Rate Limiting (HIGH)
 
@@ -77,15 +75,13 @@ class ReviewRequest(BaseModel):
 | CORS bypass | Low | Low | Allow-list is explicit, empty strings filtered |
 | Denial of service | Medium | Medium | Add rate limiting + input size limits |
 | Secret leakage | Low | High | Env vars only, gitignored |
-| Supply chain attack | Low | High | Bun 24h supply-chain guard enabled |
+| Supply chain attack | Low | Medium | Frontend has no runtime npm dependencies |
 
 ### What Cannot Happen
 
-- **No database** → No SQL injection, no data breach
 - **No file system access** from user input → No path traversal
-- **No user accounts** → No broken auth, no privilege escalation
 - **No cookie-based auth** → No CSRF
-- **React JSX** → No stored/reflected XSS
+- **Escaped static rendering** → Reduced stored/reflected XSS risk
 - **No user-controlled URLs** → No SSRF
 
 ---
@@ -98,9 +94,7 @@ The backend CORS middleware allows requests only from:
 origins = [
     "http://localhost:5173",              # Local dev
     "http://localhost:3000",              # Legacy dev
-    "https://reforge-client.onrender.com", # Old frontend
-    os.getenv("FRONTEND_URL", ""),        # Configurable old
-    os.getenv("NEW_FRONTEND_URL", ""),    # Configurable new
+    os.getenv("NEW_FRONTEND_URL", ""),    # Configurable deployed frontend
 ]
 ```
 
@@ -116,14 +110,7 @@ All dependencies pinned to specific versions in `requirements.txt`. No unpinned 
 
 ### Frontend
 
-`bunfig.toml` enforces a 24-hour supply-chain guard:
-
-```toml
-[install]
-minimumReleaseAge = 86400
-```
-
-New package versions must be at least 24 hours old before Bun will install them. This mitigates typosquatting and newly-published malicious packages.
+The frontend has no runtime npm dependencies. The optional `npm run build` script only copies static files into `dist/` for Render compatibility.
 
 ---
 

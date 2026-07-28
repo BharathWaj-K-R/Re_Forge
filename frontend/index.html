@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="ReForge — AI-powered code review with a deterministic scoring engine." />
+    <title>ReForge | Code Review</title>
+    <link rel="icon" href="assets/reforgelogo.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="stylesheet" href="css/styles.css" />
+    <script src="js/config.js" defer></script>
+    <script src="js/api.js" defer></script>
+    <script src="js/auth.js" defer></script>
+    <script src="js/gauge.js" defer></script>
+    <script src="js/review.js" defer></script>
+    <script src="js/history.js" defer></script>
+    <script src="js/app.js" defer></script>
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="site-header">
+        <a class="brand" href="#home" aria-label="ReForge home">
+          <img src="assets/reforgelogo.png" alt="ReForge logo" />
+          <span>ReForge</span>
+        </a>
+        <nav class="nav-links" aria-label="Primary navigation">
+          <a href="#home">Home</a>
+          <a href="#dashboard" data-auth-link>Dashboard</a>
+          <a href="#history" data-auth-link>History</a>
+          <a href="#auth" data-guest-link>Sign in</a>
+          <button class="link-button hidden" type="button" data-logout>Logout</button>
+        </nav>
+      </header>
+      <div class="ruler" aria-hidden="true"></div>
+
+      <main>
+        <section id="home" class="view active">
+          <div class="hero-grid">
+            <div class="hero-copy">
+              <p class="eyebrow">Multi-agent review pipeline</p>
+              <h1>Raw code in.<br /><span class="accent">Tempered</span> code out.</h1>
+              <p class="hero-text">
+                Paste code and pick a language. Specialist agents inspect it for bugs, security
+                gaps, performance issues, and style — a critic agent clears out the noise, and a
+                deterministic engine sets the score. Same findings, same score, every run.
+              </p>
+              <div class="hero-actions">
+                <a class="button primary" href="#review-demo">Run a free review</a>
+                <a class="button secondary" href="#auth" data-guest-link>Sign in to save history</a>
+              </div>
+            </div>
+            <div class="hero-card panel" data-hero-gauge>
+              <!-- Temper gauge is rendered here by js/gauge.js -->
+            </div>
+          </div>
+
+          <div class="pipeline-rail" aria-label="Review pipeline stages">
+            <div class="pipeline-step">
+              <span class="step-index">01</span>
+              <span class="step-name">Plan</span>
+              <span class="step-detail">Reads the code and decides which specialists are worth running.</span>
+            </div>
+            <div class="pipeline-step">
+              <span class="step-index">02</span>
+              <span class="step-name">Inspect</span>
+              <span class="step-detail">Bug, security, performance, and style agents run in parallel with tool assists.</span>
+            </div>
+            <div class="pipeline-step">
+              <span class="step-index">03</span>
+              <span class="step-name">Verify</span>
+              <span class="step-detail">Deterministic checks confirm or reject each raw finding.</span>
+            </div>
+            <div class="pipeline-step">
+              <span class="step-index">04</span>
+              <span class="step-name">Critique</span>
+              <span class="step-detail">Duplicate and low-confidence findings are filtered out.</span>
+            </div>
+            <div class="pipeline-step">
+              <span class="step-index">05</span>
+              <span class="step-name">Score</span>
+              <span class="step-detail">A fixed formula converts findings to a score. The model never grades itself.</span>
+            </div>
+          </div>
+
+          <section id="review-demo" class="panel">
+            <div class="section-heading">
+              <p class="eyebrow">Open bench</p>
+              <h2>Run an anonymous review</h2>
+            </div>
+            <form class="review-form" data-review-form="anonymous">
+              <label>
+                Language
+                <select name="language">
+                  <option value="python">Python</option>
+                  <option value="javascript">JavaScript</option>
+                  <option value="typescript">TypeScript</option>
+                  <option value="java">Java</option>
+                  <option value="go">Go</option>
+                  <option value="rust">Rust</option>
+                </select>
+              </label>
+              <label>
+                Code
+                <textarea name="code" spellcheck="false">def divide(a, b):
+    return a / b</textarea>
+              </label>
+              <button class="button primary" type="submit">Review code</button>
+            </form>
+            <div class="message" data-review-message="anonymous"></div>
+            <div class="results" data-review-results="anonymous"></div>
+          </section>
+        </section>
+
+        <section id="auth" class="view">
+          <div class="section-heading">
+            <p class="eyebrow">Account</p>
+            <h2>Sign in or create an account</h2>
+          </div>
+          <div class="auth-shell panel">
+            <div class="auth-tabs" data-auth-tabs role="tablist">
+              <button type="button" class="auth-tab active" data-auth-tab="login" role="tab" aria-selected="true">Sign in</button>
+              <button type="button" class="auth-tab" data-auth-tab="register" role="tab" aria-selected="false">Create account</button>
+            </div>
+
+            <form class="stack auth-step" data-auth-step="login" data-auth-form="login">
+              <input name="email" type="email" placeholder="Email" required />
+              <input name="password" type="password" placeholder="Password" required />
+              <button class="button primary" type="submit">Login</button>
+            </form>
+
+            <form class="stack auth-step hidden" data-auth-step="register" data-auth-form="register">
+              <input name="name" type="text" placeholder="Name" required />
+              <input name="email" type="email" placeholder="Email" required />
+              <input name="password" type="password" placeholder="Password" minlength="6" required />
+              <button class="button primary" type="submit">Register</button>
+            </form>
+          </div>
+          <div class="message" data-auth-message></div>
+        </section>
+
+
+        <section id="dashboard" class="view">
+          <div class="section-heading">
+            <p class="eyebrow">Authenticated workbench</p>
+            <h2>Review and save</h2>
+            <p class="muted" data-user-greeting></p>
+          </div>
+          <div class="panel">
+            <form class="review-form" data-review-form="dashboard">
+              <label>
+                Language
+                <select name="language">
+                  <option value="python">Python</option>
+                  <option value="javascript">JavaScript</option>
+                  <option value="typescript">TypeScript</option>
+                  <option value="java">Java</option>
+                  <option value="go">Go</option>
+                  <option value="rust">Rust</option>
+                </select>
+              </label>
+              <label>
+                Code
+                <textarea name="code" spellcheck="false">const token = "demo";
+console.log(token);</textarea>
+              </label>
+              <button class="button primary" type="submit">Review and save</button>
+            </form>
+            <div class="message" data-review-message="dashboard"></div>
+            <div class="results" data-review-results="dashboard"></div>
+          </div>
+        </section>
+
+        <section id="history" class="view">
+          <div class="section-heading row-heading">
+            <div>
+              <p class="eyebrow">Work orders</p>
+              <h2>Review history</h2>
+            </div>
+            <div class="button-row">
+              <button class="button secondary" type="button" data-load-history>Refresh</button>
+              <button class="button danger" type="button" data-clear-history>Clear history</button>
+              <button class="button ghost" type="button" data-delete-account>Delete account</button>
+            </div>
+          </div>
+          <div class="message" data-history-message></div>
+          <div class="history-layout">
+            <div class="panel"><div data-history-list></div></div>
+            <div class="panel"><div data-history-detail class="muted">Select a review to view details.</div></div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>

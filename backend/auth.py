@@ -49,15 +49,6 @@ class LoginRequest(BaseModel):
     password: str
 
 
-class VerifyOtpRequest(BaseModel):
-    email: str
-    otp: str
-
-
-class ResendOtpRequest(BaseModel):
-    email: str
-
-
 class ForgotPasswordRequest(BaseModel):
     email: str
 
@@ -117,56 +108,31 @@ def require_user(user: User | None = Depends(get_current_user)) -> User:
 
 
 # --- Endpoints ---
-@router.post("/register")
+@router.post("/register", response_model=TokenResponse)
 def register(req: RegisterRequest, db: Session = Depends(get_db)):
     existing = db.query(User).filter(User.email == req.email).first()
-
-    if existing and existing.is_verified:
+    if existing:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="This email is already registered and verified. Try signing in instead.",
+            detail="Email already registered. Try signing in instead.",
         )
 
-    if existing:
-        # Row exists but was never verified (e.g. they lost the code, or the
-        # first attempt never made it past registration). Don't dead-end
-        # them behind "already registered" - update their details and send
-        # a fresh code so they can pick up where they left off.
-        if existing.otp_sent_at:
-            elapsed = (datetime.now(timezone.utc) - existing.otp_sent_at).total_seconds()
-            if elapsed < 60:
-                raise HTTPException(
-                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                    detail=f"Please wait {int(60 - elapsed)} seconds before requesting a new code",
-                )
-        user = existing
-        user.name = req.name
-        user.hashed_password = hash_password(req.password)
-    else:
-        user = User(
-            email=req.email,
-            name=req.name,
-            hashed_password=hash_password(req.password),
-            is_verified=0,
-        )
-        db.add(user)
-        db.commit()
-        db.refresh(user)
-
-    # Generate and send OTP
-    otp = generate_otp()
-    user.otp_code = otp
-    user.otp_expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
-    user.otp_sent_at = datetime.now(timezone.utc)
+    user = User(
+        email=req.email,
+        name=req.name,
+        hashed_password=hash_password(req.password),
+        is_verified=1,
+    )
+    db.add(user)
     db.commit()
+    db.refresh(user)
 
-    send_otp_email(user.email, otp, purpose="verify")
-
-    return {
-        "success": True,
-        "message": "Verification code sent",
-        "email": user.email,
-    }
+    token = create_access_token(user.id)
+    return TokenResponse(
+        access_token=token,
+        token_type="bearer",
+        user={"id": user.id, "email": user.email, "name": user.name},
+    )
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -176,12 +142,6 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
-        )
-
-    if not user.is_verified:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Email not verified",
         )
 
     token = create_access_token(user.id)
@@ -200,91 +160,6 @@ def me(user: User = Depends(require_user)):
         name=user.name,
         created_at=user.created_at,
     )
-
-
-@router.post("/verify-otp", response_model=TokenResponse)
-def verify_otp(req: VerifyOtpRequest, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == req.email).first()
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found",
-        )
-
-    if user.is_verified:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already verified",
-        )
-
-    if not user.otp_code or not user.otp_expires_at:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="OTP not sent or expired",
-        )
-
-    if datetime.now(timezone.utc) > user.otp_expires_at:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="OTP expired",
-        )
-
-    if user.otp_code != req.otp:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid OTP",
-        )
-
-    user.is_verified = 1
-    user.otp_code = None
-    user.otp_expires_at = None
-    user.otp_sent_at = None
-    db.commit()
-
-    token = create_access_token(user.id)
-    return TokenResponse(
-        access_token=token,
-        token_type="bearer",
-        user={"id": user.id, "email": user.email, "name": user.name},
-    )
-
-
-@router.post("/resend-otp")
-def resend_otp(req: ResendOtpRequest, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == req.email).first()
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found",
-        )
-
-    if user.is_verified:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already verified",
-        )
-
-    # Rate limit: 60 seconds between OTP sends
-    if user.otp_sent_at:
-        elapsed = (datetime.now(timezone.utc) - user.otp_sent_at).total_seconds()
-        if elapsed < 60:
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail=f"Please wait {int(60 - elapsed)} seconds before requesting a new OTP",
-            )
-
-    otp = generate_otp()
-    user.otp_code = otp
-    user.otp_expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
-    user.otp_sent_at = datetime.now(timezone.utc)
-    db.commit()
-
-    send_otp_email(user.email, otp, purpose="verify")
-
-    return {
-        "success": True,
-        "message": "Verification code resent",
-    }
 
 
 @router.post("/forgot-password")

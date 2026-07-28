@@ -40,19 +40,11 @@
   }
 
   async function register(payload) {
-    return window.ReForgeAPI.apiRequest("/auth/register", { method: "POST", body: JSON.stringify(payload) });
+    return normalizeTokenResponse(await window.ReForgeAPI.apiRequest("/auth/register", { method: "POST", body: JSON.stringify(payload) }));
   }
 
   async function login(payload) {
     return normalizeTokenResponse(await window.ReForgeAPI.apiRequest("/auth/login", { method: "POST", body: JSON.stringify(payload) }));
-  }
-
-  async function verifyOtp(payload) {
-    return normalizeTokenResponse(await window.ReForgeAPI.apiRequest("/auth/verify-otp", { method: "POST", body: JSON.stringify(payload) }));
-  }
-
-  async function resendOtp(payload) {
-    return window.ReForgeAPI.apiRequest("/auth/resend-otp", { method: "POST", body: JSON.stringify(payload) });
   }
 
   async function forgotPassword(payload) {
@@ -72,8 +64,6 @@
     logout,
     register,
     login,
-    verifyOtp,
-    resendOtp,
     forgotPassword,
     resetPassword,
   };

@@ -15,15 +15,15 @@ SMTP_FROM_EMAIL = os.getenv("SMTP_FROM_EMAIL", "")
 SMTP_FROM_NAME = os.getenv("SMTP_FROM_NAME", "ReForge")
 
 
-def send_otp_email(to_email: str, otp: str, purpose: str = "verify") -> bool:
+def send_otp_email(to_email: str, otp: str, purpose: str = "reset") -> bool:
     """
-    Send OTP email to user.
-    
+    Send a password-reset OTP email.
+
     Args:
         to_email: Recipient email address
         otp: 6-digit OTP code
-        purpose: "verify" for email verification, "reset" for password reset
-    
+        purpose: kept for forward-compatibility; only "reset" is used today
+
     Returns:
         True if sent successfully, False otherwise
     """
@@ -35,36 +35,20 @@ def send_otp_email(to_email: str, otp: str, purpose: str = "verify") -> bool:
         return False
 
     try:
-        if purpose == "verify":
-            subject = "Verify your ReForge account"
-            body = f"""
-            <html>
-            <body>
-                <h2>Welcome to ReForge!</h2>
-                <p>Your verification code is:</p>
-                <h1 style="font-size: 32px; letter-spacing: 8px; text-align: center; background: #f0f0f0; padding: 20px; border-radius: 8px;">
-                    {otp}
-                </h1>
-                <p>This code expires in 10 minutes.</p>
-                <p>If you didn't create an account, you can safely ignore this email.</p>
-            </body>
-            </html>
-            """
-        else:  # purpose == "reset"
-            subject = "Reset your ReForge password"
-            body = f"""
-            <html>
-            <body>
-                <h2>Password Reset Request</h2>
-                <p>Your password reset code is:</p>
-                <h1 style="font-size: 32px; letter-spacing: 8px; text-align: center; background: #f0f0f0; padding: 20px; border-radius: 8px;">
-                    {otp}
-                </h1>
-                <p>This code expires in 10 minutes.</p>
-                <p>If you didn't request a password reset, you can safely ignore this email.</p>
-            </body>
-            </html>
-            """
+        subject = "Reset your ReForge password"
+        body = f"""
+        <html>
+        <body>
+            <h2>Password Reset Request</h2>
+            <p>Your password reset code is:</p>
+            <h1 style="font-size: 32px; letter-spacing: 8px; text-align: center; background: #f0f0f0; padding: 20px; border-radius: 8px;">
+                {otp}
+            </h1>
+            <p>This code expires in 10 minutes.</p>
+            <p>If you didn't request a password reset, you can safely ignore this email.</p>
+        </body>
+        </html>
+        """
 
         msg = MIMEMultipart("alternative")
         msg["Subject"] = subject

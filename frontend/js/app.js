@@ -71,8 +71,6 @@
     }
   }
 
-  let pendingEmail = "";
-
   function setAuthStep(step) {
     document.querySelectorAll("[data-auth-step]").forEach((el) => {
       el.classList.toggle("hidden", el.dataset.authStep !== step);
@@ -83,8 +81,6 @@
       tab.setAttribute("aria-selected", String(active));
     });
     setMessage($("[data-auth-message]"), "", "");
-    const resetDisplay = $("[data-reset-email-display]");
-    if (resetDisplay) resetDisplay.textContent = pendingEmail || "your email";
   }
 
   async function handleAuthSubmit(event) {
@@ -92,14 +88,10 @@
     const form = event.currentTarget;
     const type = form.dataset.authForm;
     const data = Object.fromEntries(new FormData(form).entries());
-    if (type === "reset") data.email = pendingEmail;
-    if (type === "forgot") pendingEmail = data.email;
     const message = $("[data-auth-message]");
     const actions = {
       register: window.ReForgeAuth.register,
       login: window.ReForgeAuth.login,
-      forgot: window.ReForgeAuth.forgotPassword,
-      reset: window.ReForgeAuth.resetPassword,
     };
 
     setBusy(form, true);
@@ -108,11 +100,7 @@
       const response = await actions[type](data);
       setMessage(message, response.message || "Success.", "success");
       updateNav();
-      if (["login", "register"].includes(type)) {
-        window.location.hash = "dashboard";
-      } else if (type === "forgot") {
-        setAuthStep("reset");
-      }
+      window.location.hash = "dashboard";
     } catch (error) {
       setMessage(message, error.message, "error");
     } finally {
@@ -157,7 +145,6 @@
     document.querySelectorAll("[data-review-form]").forEach((form) => form.addEventListener("submit", handleReviewSubmit));
     document.querySelectorAll("[data-auth-form]").forEach((form) => form.addEventListener("submit", handleAuthSubmit));
     document.querySelectorAll("[data-auth-tab]").forEach((tab) => tab.addEventListener("click", () => setAuthStep(tab.dataset.authTab)));
-    document.querySelectorAll("[data-goto-step]").forEach((btn) => btn.addEventListener("click", () => setAuthStep(btn.dataset.gotoStep)));
     document.querySelectorAll("[data-logout]").forEach((button) => button.addEventListener("click", () => {
       window.ReForgeAuth.logout();
       updateNav();

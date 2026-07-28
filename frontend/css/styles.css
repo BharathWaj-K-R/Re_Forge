@@ -338,17 +338,6 @@ input::placeholder { color: var(--ink-faint); }
 .auth-tab + .auth-tab { border-left: 1px solid var(--line-strong); }
 .auth-tab.active { background: var(--steel); color: var(--paper-raised); }
 .auth-step h2 { margin-top: 0; }
-.auth-link {
-  justify-self: start;
-  padding: 0;
-  min-height: auto;
-  font-family: var(--font-display);
-  font-size: 0.76rem;
-  color: var(--steel);
-  text-transform: none;
-  letter-spacing: 0;
-}
-.auth-link:hover { text-decoration: underline; }
 .inline-form { display: grid; grid-template-columns: 1fr auto; gap: 0.7rem; margin-top: 0.8rem; }
 
 .message {

@@ -126,7 +126,6 @@
               <input name="email" type="email" placeholder="Email" required />
               <input name="password" type="password" placeholder="Password" required />
               <button class="button primary" type="submit">Login</button>
-              <button class="link-button auth-link" type="button" data-goto-step="forgot">Forgot password?</button>
             </form>
 
             <form class="stack auth-step hidden" data-auth-step="register" data-auth-form="register">
@@ -135,24 +134,6 @@
               <input name="password" type="password" placeholder="Password" minlength="6" required />
               <button class="button primary" type="submit">Register</button>
             </form>
-
-            <div class="stack auth-step hidden" data-auth-step="forgot">
-              <p class="muted">We'll send a reset code to your email.</p>
-              <form class="stack" data-auth-form="forgot">
-                <input name="email" type="email" placeholder="Email" required />
-                <button class="button primary" type="submit">Send reset code</button>
-              </form>
-              <button class="link-button auth-link" type="button" data-goto-step="login">Back to sign in</button>
-            </div>
-
-            <div class="stack auth-step hidden" data-auth-step="reset">
-              <p class="muted">Enter the code we sent to <strong data-reset-email-display>your email</strong>, plus a new password.</p>
-              <form class="stack" data-auth-form="reset">
-                <input name="otp" type="text" inputmode="numeric" placeholder="Reset code" required />
-                <input name="new_password" type="password" placeholder="New password" minlength="6" required />
-                <button class="button primary" type="submit">Reset password</button>
-              </form>
-            </div>
           </div>
           <div class="message" data-auth-message></div>
         </section>

@@ -13,10 +13,6 @@ class User(Base):
     email = Column(String(255), unique=True, index=True, nullable=False)
     name = Column(String(100), nullable=False)
     hashed_password = Column(String(255), nullable=False)
-    is_verified = Column(Integer, default=0)  # 0=False, 1=True
-    otp_code = Column(String(6), nullable=True)
-    otp_expires_at = Column(DateTime, nullable=True)
-    otp_sent_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     reviews = relationship("Review", back_populates="user", cascade="all, delete-orphan")

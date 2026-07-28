@@ -47,14 +47,6 @@
     return normalizeTokenResponse(await window.ReForgeAPI.apiRequest("/auth/login", { method: "POST", body: JSON.stringify(payload) }));
   }
 
-  async function forgotPassword(payload) {
-    return window.ReForgeAPI.apiRequest("/auth/forgot-password", { method: "POST", body: JSON.stringify(payload) });
-  }
-
-  async function resetPassword(payload) {
-    return window.ReForgeAPI.apiRequest("/auth/reset-password", { method: "POST", body: JSON.stringify(payload) });
-  }
-
   window.ReForgeAuth = {
     saveSession,
     getSession,
@@ -64,7 +56,5 @@
     logout,
     register,
     login,
-    forgotPassword,
-    resetPassword,
   };
 })();

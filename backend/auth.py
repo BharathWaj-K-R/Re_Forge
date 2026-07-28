@@ -119,23 +119,39 @@ def require_user(user: User | None = Depends(get_current_user)) -> User:
 # --- Endpoints ---
 @router.post("/register")
 def register(req: RegisterRequest, db: Session = Depends(get_db)):
-    # Check if email already exists
     existing = db.query(User).filter(User.email == req.email).first()
-    if existing:
+
+    if existing and existing.is_verified:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Email already registered",
+            detail="This email is already registered and verified. Try signing in instead.",
         )
 
-    user = User(
-        email=req.email,
-        name=req.name,
-        hashed_password=hash_password(req.password),
-        is_verified=0,
-    )
-    db.add(user)
-    db.commit()
-    db.refresh(user)
+    if existing:
+        # Row exists but was never verified (e.g. they lost the code, or the
+        # first attempt never made it past registration). Don't dead-end
+        # them behind "already registered" - update their details and send
+        # a fresh code so they can pick up where they left off.
+        if existing.otp_sent_at:
+            elapsed = (datetime.now(timezone.utc) - existing.otp_sent_at).total_seconds()
+            if elapsed < 60:
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail=f"Please wait {int(60 - elapsed)} seconds before requesting a new code",
+                )
+        user = existing
+        user.name = req.name
+        user.hashed_password = hash_password(req.password)
+    else:
+        user = User(
+            email=req.email,
+            name=req.name,
+            hashed_password=hash_password(req.password),
+            is_verified=0,
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
 
     # Generate and send OTP
     otp = generate_otp()

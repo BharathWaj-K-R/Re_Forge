@@ -5,12 +5,13 @@ from dotenv import load_dotenv
 
 from backend.routes import router
 from backend.auth import router as auth_router
-from backend.database import engine, Base
+from backend.database import engine, Base, run_startup_migrations
 
 load_dotenv()
 
-# Create tables on startup
+# Create any brand-new tables, then add any columns missing from existing ones
 Base.metadata.create_all(bind=engine)
+run_startup_migrations()
 
 app = FastAPI(
     title="ReForge API",

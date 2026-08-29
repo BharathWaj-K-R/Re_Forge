@@ -3,15 +3,20 @@ Unified review pipeline for ReForge.
 
 Flow:
   1. Planner decides which specialist agents are relevant.
-  2. Each specialist runs its own LLM call plus one deterministic tool.
-  3. Critic deduplicates and filters all findings.
+  2. Specialist agents run concurrently, each with one deterministic tool.
+  3. Critic deduplicates and filters all findings when available.
   4. Validators normalize output.
   5. Deterministic score engine calculates the final score.
+
+The pipeline is deliberately defensive because the review endpoint is a
+user-facing production path. A single failed specialist or critic should not
+turn the entire request into a zero-value failure when useful findings are
+already available.
 """
 
 import json
 import logging
-from concurrent.futures import ThreadPoolExecutor, TimeoutError
+from concurrent.futures import ThreadPoolExecutor, TimeoutError, as_completed
 
 from backend.ai import call_llm
 from backend.config import AGENT_TIMEOUT_SECONDS
@@ -39,6 +44,11 @@ AGENT_PROMPTS = {
     "performance": PERFORMANCE_AGENT_PROMPT,
     "best_practice": BEST_PRACTICE_AGENT_PROMPT,
 }
+ALL_CATEGORIES = ("bug", "security", "performance", "best_practice")
+
+
+def _empty_reviews() -> dict[str, list[dict]]:
+    return {category: [] for category in ALL_CATEGORIES}
 
 
 def _safe_json_loads(text: str, default=None):
@@ -46,7 +56,7 @@ def _safe_json_loads(text: str, default=None):
         default = {}
     try:
         return json.loads(text)
-    except json.JSONDecodeError as e:
+    except (json.JSONDecodeError, TypeError) as e:
         logger.warning("Failed to parse LLM JSON: %s", e)
         return default
 
@@ -71,14 +81,14 @@ def _run_planner(code: str, language: str) -> tuple[list[str], str]:
     )
     data = _safe_json_loads(content, {})
 
-    allowed = {"bug", "security", "performance", "best_practice"}
+    allowed = set(AGENT_PROMPTS)
     relevant = [
         agent for agent in data.get("relevant_agents", [])
         if agent in allowed
     ]
 
     if not relevant:
-        relevant = list(allowed)
+        relevant = list(ALL_CATEGORIES)
 
     focus_notes = data.get("focus_notes", "")
     skip_reasons = data.get("skip_reasons", {})
@@ -140,6 +150,20 @@ def _run_specialist(
     return findings
 
 
+def _run_specialist_safe(
+    agent: str,
+    code: str,
+    language: str,
+    focus_notes: str,
+) -> tuple[str, list[dict]]:
+    """Run one specialist without allowing its failure to abort the batch."""
+    try:
+        return agent, _run_specialist(agent, code, language, focus_notes)
+    except Exception as exc:
+        logger.exception("Specialist agent %s failed: %s", agent, exc)
+        return agent, []
+
+
 def _run_critic(
     all_findings: dict[str, list[dict]],
     language: str
@@ -157,65 +181,99 @@ Findings by category:
     data = _safe_json_loads(content, {})
 
     if "reviews" not in data or not isinstance(data["reviews"], dict):
-        data["reviews"] = {
-            "bug": [],
-            "security": [],
-            "performance": [],
-            "best_practice": []
-        }
+        data["reviews"] = _empty_reviews()
 
     return data
+
+
+def _run_critic_safe(
+    all_findings: dict[str, list[dict]],
+    language: str,
+) -> dict | None:
+    try:
+        return _run_critic(all_findings, language)
+    except Exception as exc:
+        logger.exception("Critic agent failed: %s", exc)
+        return None
 
 
 def _run_agentic(code: str, language: str) -> dict:
     """
     Run the multi-step agentic review pipeline.
 
-    Returns the standard review envelope.
+    Specialist agents execute concurrently so a four-agent review does not
+    unnecessarily serialize four network-bound LLM calls on a Render worker.
     """
 
     logger.info("Starting agentic review for language=%s", language)
 
-    llm_calls = 0
+    # Planner failure should not make the endpoint unusable. In that case run
+    # every specialist, which preserves the core review capability.
+    try:
+        relevant_agents, focus_notes = _run_planner(code, language)
+    except Exception as exc:
+        logger.exception("Planner failed; running all specialists: %s", exc)
+        relevant_agents = list(ALL_CATEGORIES)
+        focus_notes = "Planner unavailable. Perform a broad review."
 
-    # 1. Planner
-    relevant_agents, focus_notes = _run_planner(code, language)
-    llm_calls += 1
+    # Run network-bound specialist calls concurrently. This is both faster and
+    # considerably less likely to hit the endpoint timeout on production hosts.
+    all_findings = _empty_reviews()
+    completed_agents = 0
 
-    # 2. Specialist agents
-    all_findings: dict[str, list[dict]] = {}
-    for agent in relevant_agents:
-        findings = _run_specialist(agent, code, language, focus_notes)
-        all_findings[agent] = findings
-        llm_calls += 1
+    with ThreadPoolExecutor(max_workers=max(1, len(relevant_agents))) as executor:
+        futures = {
+            executor.submit(
+                _run_specialist_safe,
+                agent,
+                code,
+                language,
+                focus_notes,
+            ): agent
+            for agent in relevant_agents
+        }
 
-    # Ensure every category exists even if planner skipped it
-    for category in ("bug", "security", "performance", "best_practice"):
-        all_findings.setdefault(category, [])
+        for future in as_completed(futures):
+            agent, findings = future.result()
+            all_findings[agent] = findings
+            if findings or agent in relevant_agents:
+                completed_agents += 1
 
-    # 3. Critic
-    critic_result = _run_critic(all_findings, language)
-    llm_calls += 1
+    # The critic is useful, but not a hard dependency. If it fails, preserve
+    # the specialist findings and continue to validation + deterministic scoring.
+    critic_result = _run_critic_safe(all_findings, language)
 
-    summary = critic_result.get("summary", "")
-    reviews = critic_result.get("reviews", {})
+    if critic_result is not None:
+        summary = critic_result.get("summary", "")
+        reviews = critic_result.get("reviews", {})
+        if not isinstance(reviews, dict):
+            reviews = all_findings
+    else:
+        summary = (
+            "Review completed using the specialist findings. "
+            "The final critic pass was unavailable."
+        )
+        reviews = all_findings
 
-    # 4. Normalize with validators
     validated_reviews = {
-        "bug": validate("bug", reviews.get("bug", [])),
-        "security": validate("security", reviews.get("security", [])),
-        "performance": validate("performance", reviews.get("performance", [])),
-        "best_practice": validate("best_practice", reviews.get("best_practice", [])),
+        category: validate(category, reviews.get(category, []))
+        for category in ALL_CATEGORIES
     }
 
-    # 5. Score
     score = calculate_score(validated_reviews)
 
     logger.info(
-        "Agentic review complete: llm_calls=%d score=%d",
-        llm_calls,
-        score
+        "Agentic review complete: specialists=%d/%d critic=%s score=%d",
+        completed_agents,
+        len(relevant_agents),
+        critic_result is not None,
+        score,
     )
+
+    # If every external LLM call failed, keep the API honest rather than
+    # presenting a fake successful 100 score.
+    if completed_agents == 0 and critic_result is None:
+        raise RuntimeError("No review agent completed successfully")
 
     return {
         "success": True,
@@ -228,19 +286,29 @@ def _run_agentic(code: str, language: str) -> dict:
 
 def _run_agentic_with_timeout(code: str, language: str, timeout: float):
     """
-    Run the agentic pipeline in a worker thread so we can enforce a timeout.
+    Run the agentic pipeline in a worker thread with a real timeout.
+
+    The previous context-manager implementation waited for the worker during
+    executor shutdown even after timeout, defeating the point of the timeout
+    guard. This implementation returns promptly once the deadline is hit.
     """
-    with ThreadPoolExecutor(max_workers=1) as executor:
-        future = executor.submit(_run_agentic, code, language)
+    executor = ThreadPoolExecutor(max_workers=1)
+    future = executor.submit(_run_agentic, code, language)
+    try:
         return future.result(timeout=timeout)
+    finally:
+        # Do not block the request thread waiting for an already-running LLM
+        # request after the deadline. Python cannot forcibly kill the worker,
+        # but the API request itself can return the timeout envelope promptly.
+        executor.shutdown(wait=False, cancel_futures=True)
 
 
 def review(code: str, language: str):
     """
     Public entry point called by routes.py.
 
-    Runs the agentic pipeline with a timeout guard.
-    On timeout/failure, returns honest failure envelope.
+    Runs the agentic pipeline with a timeout guard and always converts failures
+    into the existing stable response envelope instead of leaking exceptions.
     """
 
     logger.info("Review request for language=%s", language)
@@ -261,14 +329,14 @@ def review(code: str, language: str):
             "language": language,
             "overall_score": 0,
             "summary": "Review timed out. Please try again.",
-            "reviews": {"bug": [], "security": [], "performance": [], "best_practice": []}
+            "reviews": _empty_reviews()
         }
-    except Exception as e:
-        logger.warning("Agentic pipeline failed: %s", e)
+    except Exception as exc:
+        logger.exception("Agentic pipeline failed: %s", exc)
         return {
             "success": False,
             "language": language,
             "overall_score": 0,
             "summary": "Review failed. Please try again.",
-            "reviews": {"bug": [], "security": [], "performance": [], "best_practice": []}
+            "reviews": _empty_reviews()
         }

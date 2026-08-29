@@ -2,30 +2,19 @@
 
 Base URL: `https://reforge-api.onrender.com`
 
-Interactive docs available at: `https://reforge-api.onrender.com/docs` (Swagger UI)
+Interactive docs are available at `https://reforge-api.onrender.com/docs` when the deployed backend is running.
 
 ---
 
-## Endpoints
+## Public Endpoints
 
 ### `GET /`
 
-Welcome message.
-
-**Response:**
-
-```json
-{
-  "success": true,
-  "message": "Welcome to ReForge API"
-}
-```
-
----
+Returns a simple service welcome message.
 
 ### `GET /health`
 
-Health check for monitoring and load balancers.
+Health check used by Render.
 
 **Response:**
 
@@ -37,63 +26,33 @@ Health check for monitoring and load balancers.
 }
 ```
 
-**Used by:** Render health check (configured in `render.yaml`)
-
----
-
 ### `GET /test-ai`
 
-Verifies the Groq API connection by running a test review.
+Runs a small direct Groq test request.
 
-**Response:**
-
-```json
-{
-  "success": true,
-  "result": { ... }
-}
-```
-
-> **Note:** This endpoint consumes Groq API credits. Consider removing or protecting it in production.
-
----
+> This endpoint consumes Groq API credits and is not intended as a production workload endpoint. Consider protecting or removing it before exposing the API publicly at scale.
 
 ### `POST /review`
 
-Submit source code for AI-powered review.
+Submit source code for review. Authentication is optional. Anonymous requests are reviewed but are not saved to history; authenticated requests are saved when the review succeeds.
 
 **Request Headers:**
 
 | Header | Value |
 |---|---|
 | `Content-Type` | `application/json` |
+| `Authorization` | `Bearer <token>` for authenticated requests |
 
 **Request Body:**
 
 ```json
 {
-  "language": "string (required)",
-  "code": "string (required)"
+  "language": "python",
+  "code": "def divide(a, b):\n    return a / b"
 }
 ```
 
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `language` | string | Yes | Programming language (e.g., `python`, `javascript`, `go`) |
-| `code` | string | Yes | Source code to review |
-
-**Example Request:**
-
-```bash
-curl -X POST https://reforge-api.onrender.com/review \
-  -H "Content-Type: application/json" \
-  -d '{
-    "language": "python",
-    "code": "def divide(a, b):\n    return a / b"
-  }'
-```
-
-**Success Response (200):**
+**Success response:**
 
 ```json
 {
@@ -106,32 +65,27 @@ curl -X POST https://reforge-api.onrender.com/review \
       {
         "severity": "High",
         "title": "Division by Zero",
-        "description": "The function does not handle the case where b is zero, which will raise a ZeroDivisionError.",
-        "recommendation": "Add a check for b == 0 before performing the division."
+        "description": "The function does not handle the case where b is zero.",
+        "recommendation": "Validate b before division."
       }
     ],
     "security": [],
     "performance": [],
-    "best_practice": [
-      {
-        "severity": "Low",
-        "title": "Missing Docstring",
-        "description": "The function lacks a docstring explaining its purpose and parameters.",
-        "recommendation": "Add a docstring following PEP 257 conventions."
-      }
-    ]
+    "best_practice": []
   }
 }
 ```
 
-**Error Response (Groq failure):**
+**Failure response:**
+
+If the agentic pipeline times out or raises an unexpected exception, the current implementation returns an explicit failure envelope instead of a second review pipeline:
 
 ```json
 {
-  "success": true,
+  "success": false,
   "language": "python",
   "overall_score": 0,
-  "summary": "Unable to review the code at this time.",
+  "summary": "Review failed. Please try again.",
   "reviews": {
     "bug": [],
     "security": [],
@@ -141,21 +95,56 @@ curl -X POST https://reforge-api.onrender.com/review \
 }
 ```
 
-> Note: The API returns `success: true` even on Groq failure, with a zero score and error summary. This is by design — the endpoint itself succeeded; the AI review was unavailable.
+---
 
-**Validation Error (422):**
+## Authentication Endpoints
+
+### `POST /auth/register`
+
+Creates a new user account and returns a JWT access token.
 
 ```json
 {
-  "detail": [
-    {
-      "loc": ["body", "code"],
-      "msg": "field required",
-      "type": "value_error.missing"
-    }
-  ]
+  "email": "student@example.com",
+  "password": "password123",
+  "name": "Student"
 }
 ```
+
+### `POST /auth/login`
+
+Authenticates an existing user and returns a JWT access token.
+
+```json
+{
+  "email": "student@example.com",
+  "password": "password123"
+}
+```
+
+### `GET /auth/me`
+
+Returns the currently authenticated user. Requires a Bearer token.
+
+---
+
+## Review History Endpoints
+
+### `GET /history`
+
+Returns saved reviews belonging to the authenticated user.
+
+### `GET /history/{review_id}`
+
+Returns the full saved review for the authenticated user.
+
+### `DELETE /history`
+
+Deletes all saved reviews belonging to the authenticated user.
+
+### `DELETE /account`
+
+Deletes the authenticated user's account and saved reviews.
 
 ---
 
@@ -165,20 +154,21 @@ curl -X POST https://reforge-api.onrender.com/review \
 
 | Field | Type | Description |
 |---|---|---|
-| `success` | boolean | Whether the review completed |
-| `language` | string | Echo of the submitted language |
-| `overall_score` | integer | 0-100 quality score |
-| `summary` | string | AI-generated review summary |
-| `reviews` | object | Categorized findings |
+| `success` | boolean | Whether the review completed successfully |
+| `language` | string | Submitted programming language |
+| `overall_score` | number | Deterministic score from 0 to 100 |
+| `summary` | string | Review summary |
+| `reviews` | object | Findings grouped into four categories |
+| `review_id` | integer | Present when an authenticated successful review is saved |
 
 ### Reviews Object
 
-| Key | Type | Description |
-|---|---|---|
-| `bug` | Finding[] | Logic errors, runtime issues |
-| `security` | Finding[] | Vulnerabilities, secrets |
-| `performance` | Finding[] | Efficiency issues |
-| `best_practice` | Finding[] | Code quality issues |
+| Key | Description |
+|---|---|
+| `bug` | Logic and runtime issues |
+| `security` | Security vulnerabilities and credential issues |
+| `performance` | Efficiency and performance issues |
+| `best_practice` | Maintainability and code-quality issues |
 
 ### Finding Object
 
@@ -186,60 +176,53 @@ curl -X POST https://reforge-api.onrender.com/review \
 |---|---|---|
 | `severity` | string | `Critical`, `High`, `Medium`, or `Low` |
 | `title` | string | Short finding title |
-| `description` | string | Detailed explanation |
-| `recommendation` | string | How to fix or improve |
+| `description` | string | Explanation of the issue |
+| `recommendation` | string | Suggested improvement |
 
-### Severity Levels
+---
 
-| Severity | Score Deduction | Examples |
-|---|---|---|
-| Critical | -30 | Remote code execution, SQL injection |
-| High | -20 | Hardcoded secrets, division by zero, infinite loops |
-| Medium | -10 | Bare except clauses, missing input validation |
-| Low | -5 | Missing docstrings, naming conventions |
+## Severity and Scoring
+
+| Severity | Score Deduction |
+|---|---:|
+| Critical | -30 |
+| High | -20 |
+| Medium | -10 |
+| Low | -5 |
+
+The score starts at 100 and is clamped at 0.
 
 ---
 
 ## Supported Languages
 
-The API accepts any language string. The AI adapts its analysis to the specified language. Commonly tested:
+The API accepts a language string and sends it to the LLM pipeline. The frontend currently offers:
 
 - `python`
 - `javascript`
 - `typescript`
+- `java`
 - `go`
 - `rust`
-- `java`
-- `cpp`
 
-Deterministic tools (AST check, secret detection, loop analysis) have language-specific behavior — see [ARCHITECTURE.md](ARCHITECTURE.md) for details.
-
----
-
-## Rate Limiting
-
-Currently **no rate limiting** is enforced. This is a known limitation for production deployment.
-
----
-
-## CORS
-
-The API supports Cross-Origin Resource Sharing for the following origins:
-
-- `http://localhost:5173` (local dev)
-- `http://localhost:3000` (legacy dev)
-- `https://reforge-client.onrender.com` (old frontend)
-- Value of `FRONTEND_URL` env var
-- Value of `NEW_FRONTEND_URL` env var
+Deterministic tools have language-specific behavior. See [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ---
 
 ## Error Handling
 
-| Scenario | Behavior |
+| Scenario | Current behavior |
 |---|---|
-| Missing fields in request | 422 Validation Error |
-| Groq API unavailable | Returns zero-score envelope with error summary |
-| Invalid JSON from LLM | Classic: caught and returned as error. Agentic: fallback to classic |
-| Agentic timeout | Falls back to classic pipeline |
-| Invalid severity from LLM | Downgraded to "Low" by validator |
+| Missing request fields | FastAPI/Pydantic returns HTTP 422 |
+| Invalid credentials | Authentication endpoint returns HTTP 401 |
+| Duplicate registration email | Registration returns HTTP 409 |
+| Agentic timeout | Review returns a `success: false` failure envelope |
+| Unexpected review exception | Review returns a `success: false` failure envelope |
+| Invalid LLM JSON | Pipeline safely converts it to an empty/default structure before validation |
+| Invalid finding severity | Validator normalizes it to `Low` |
+
+---
+
+## Current Security Limitations
+
+The API currently does not enforce request rate limiting or request body size limits. Anonymous `/review` requests and `/test-ai` can therefore consume Groq API credits. See [SECURITY.md](SECURITY.md) for the current security posture and recommended hardening.

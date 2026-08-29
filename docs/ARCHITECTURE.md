@@ -34,61 +34,48 @@ Client (Browser)
       │  POST /review { code, language }
       ▼
 ┌─────────────────┐
-│   FastAPI Route  │  Pydantic validates request body
+│   FastAPI Route │  Pydantic validates request body
 │   routes.py     │
 └────────┬────────┘
          │
          ▼
 ┌─────────────────┐
-│  Pipeline        │  Unified agentic pipeline
-│  pipeline.py     │  with timeout guard
+│  Review Pipeline │  Agentic pipeline with timeout guard
+│  pipeline.py     │
 └────────┬────────┘
          │
-    ┌────┴─────┐
-    │          │
-    ▼          ▼
- Agentic    Classic
- (default)  (fallback)
-```
-
-### Classic Pipeline (Fallback)
-
-The classic pipeline makes a single LLM call, then validates and scores deterministically.
-
-```
-Code + Language
-      │
-      ▼
-┌──────────────────┐
-│  Single LLM Call  │  Groq Llama 3.3 70B
-│  ai.py            │  Returns JSON with findings
-└────────┬──────────┘
-         │
-         ▼
-┌──────────────────────────────────┐
-│  Validation Layer                 │  Normalizes schema,
-│  validators.py                    │  fixes invalid severities,
-│                                    │  ensures all fields present
-└────────┬─────────────────────────┘
-         │
          ▼
 ┌──────────────────┐
-│  Score Engine     │  100 - sum(severity deductions)
-│  score.py         │  Floor at 0
-└────────┬──────────┘
+│ Planner Agent    │  Selects relevant specialist agents
+└────────┬─────────┘
          │
-         ▼
-Response Envelope
-{ success, language, overall_score, summary, reviews }
+    ┌────┴──────────────┬──────────────┐
+    ▼                   ▼              ▼
+ Bug + AST        Security + Secret   Performance + Loop
+    │                   │              │
+    └───────────────────┴──────────────┘
+                        │
+                        ▼
+                 Best Practice
+                        │
+                        ▼
+                  Critic Agent
+                        │
+                        ▼
+                 Validation Layer
+                        │
+                        ▼
+                  Score Engine
+                        │
+                        ▼
+                    Response
 ```
 
-**LLM calls:** 1  
-**Latency:** ~1-3 seconds  
-**Reproducibility:** Same code + same findings = same score every time
+The planner may skip specialists when appropriate. The pipeline still returns all four response categories so the frontend has a stable response shape. The current implementation does not execute a separate classic pipeline fallback.
 
-### Agentic Pipeline (Default)
+### Agentic Pipeline
 
-The agentic pipeline uses multiple specialized LLM calls with deterministic tools for deeper analysis.
+The agentic pipeline uses a planner, up to four specialist agents, deterministic tools, a critic, validators, and the deterministic score engine.
 
 ```
 Code + Language
@@ -98,7 +85,7 @@ Code + Language
 │  Planner Agent    │  LLM Call #1
 │  Decides which    │  Selects relevant specialists
 │  agents to run    │  Provides focus notes
-└────────┬──────────┘
+└────────┬─────────┘
          │
     ┌────┴────────────────────────────┐
     │         │         │             │
@@ -107,29 +94,30 @@ Code + Language
 │  Bug   ││Security││Perform.  ││Best Practice │
 │+ AST   ││+ Secret││+ Loop    ││              │
 │  tool  ││  tool  ││  tool    ││              │
-│LLM #2  ││LLM #3  ││LLM #4    ││LLM #5 (opt)  │
-└────┬───┘└───┬────┘└────┬─────┘└──────┬───────┘
-     │        │          │              │
-     └────────┴──────────┴──────────────┘
+│LLM     ││LLM     ││LLM       ││LLM           │
+└────┬───┘└────┬───┘└────┬─────┘└──────┬───────┘
+     │         │          │              │
+     └─────────┴──────────┴──────────────┘
+                       │
+                       ▼
+               ┌──────────────┐
+               │ Critic Agent │
+               │ Deduplicates │
+               │ and filters  │
+               └──────┬───────┘
                       │
                       ▼
-              ┌──────────────┐
-              │  Critic Agent │  LLM Call #6
-              │  Deduplicates │  Removes false positives
-              │  and filters  │  Produces summary
-              └──────┬───────┘
-                     │
-                     ▼
-              Validation Layer (same as classic)
-                     │
-                     ▼
-              Score Engine (same as classic)
+               Validation Layer
+                      │
+                      ▼
+                Score Engine
 ```
 
-**LLM calls:** 3-6  
-**Latency:** ~5-15 seconds  
-**Timeout:** Configurable (default 25s), returns honest failure on timeout  
-**Deterministic tools:** AST check, secret detection, infinite loop detection
+**LLM calls:** 3-6 depending on planner selection  
+**Timeout:** Configurable with `AGENT_TIMEOUT_SECONDS` (default 25 seconds)  
+**Deterministic tools:** AST check, secret detection, infinite-loop heuristic
+
+On timeout or an unexpected pipeline exception, the current implementation returns a failure envelope instead of raising the error through the API request. The frontend displays that result as a failed review. This is a failure-safe response path, not a second review pipeline.
 
 ## Frontend Architecture
 
@@ -152,12 +140,13 @@ frontend/
   js/review.js            # Review submission and result rendering
   js/history.js           # History/account API helpers
   js/app.js               # Event wiring and hash navigation
+  js/gauge.js             # Score gauge rendering
   assets/reforgelogo.png  # Logo asset
 ```
 
 ### API Integration
 
-The frontend reads the backend API URL at runtime from `frontend/js/config.js`:
+The frontend reads the backend API URL from `frontend/js/config.js`:
 
 ```js
 window.REFORGE_CONFIG = {
@@ -165,18 +154,7 @@ window.REFORGE_CONFIG = {
 };
 ```
 
-All API calls use the existing backend routes. Authenticated calls include `Authorization: Bearer <token>` from the `reforge_session` localStorage entry.
-
-### Response Rendering
-
-The backend returns findings as arrays grouped by category. The static frontend renders the overall score, summary, and four finding categories directly from that response:
-
-```text
-Backend: { reviews: { bug: [{ severity: "High", ... }] } }
-                │
-                ▼
-Frontend: score panel + bug/security/performance/best-practice cards
-```
+All API calls use the backend routes. Authenticated calls include `Authorization: Bearer <token>` from the `reforge_session` localStorage entry.
 
 ## Data Flow
 
@@ -191,20 +169,25 @@ Frontend sends POST /review
 Backend validates request (Pydantic)
         │
         ▼
-Review pipeline runs (agentic only)
+Planner selects relevant specialist agents
+        │
+        ▼
+Specialists + deterministic tools run
+        │
+        ▼
+Critic deduplicates and filters findings
+        │
+        ▼
+Validators normalize the findings
+        │
+        ▼
+Score engine calculates deterministic score
         │
         ▼
 Backend returns structured response
-{ success, language, overall_score, summary, reviews }
         │
         ▼
-Frontend transforms response
-        │
-        ▼
-UI renders:
-  - ScoreRing (overall score with animated SVG)
-  - CategoryCards (4 cards: bugs, security, performance, best practices)
-  - Summary text
+Frontend renders score, summary, and categories
 ```
 
 ## Scoring Methodology
@@ -221,13 +204,34 @@ The score is computed deterministically from findings — the LLM never assigns 
 Starting score: **100**  
 Floor: **0** (never negative)
 
-This ensures identical findings always produce identical scores, regardless of model version or temperature.
+## Database Architecture
+
+The backend uses SQLAlchemy models for users and saved reviews. Production can use PostgreSQL through `DATABASE_URL`; local development falls back to SQLite when that variable is absent.
+
+The application creates missing tables at startup and also checks for missing columns in existing mapped tables. The database module is therefore part of the runtime startup path and must be preserved.
+
+## Authentication Flow
+
+```
+Frontend
+   │
+   ├── POST /auth/register
+   │          └── Create User + JWT
+   │
+   └── POST /auth/login
+              └── Validate Password + JWT
+
+JWT stored in browser localStorage
+             │
+             ▼
+Authenticated API request
+Authorization: Bearer <token>
+```
 
 ## Design Principles
 
-1. **Deterministic scoring** — The model generates findings; logic computes scores
-2. **Validation before output** — Every AI finding passes through a validator
-3. **Graceful degradation** — Agentic → error envelope → mock analysis
-4. **Separation of concerns** — Each module has one responsibility
-5. **Reproducibility** — Same input → same output, every time
-6. **Two-service architecture** — Frontend and backend deploy independently
+1. **Deterministic scoring** — The model generates findings; code computes scores
+2. **Validation before output** — AI findings pass through a validator before display
+3. **Failure-safe runtime** — Timeout/failure returns an explicit failure envelope
+4. **Separation of concerns** — Each module has one clear responsibility
+5. **Two-service architecture** — Frontend and backend deploy independently

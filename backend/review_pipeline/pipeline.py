@@ -11,7 +11,9 @@ Flow:
 The pipeline is deliberately defensive because the review endpoint is a
 user-facing production path. A single failed specialist or critic should not
 turn the entire request into a zero-value failure when useful findings are
-already available.
+already available. If the external LLM service is unavailable, the existing
+deterministic analyzers provide a local fallback instead of returning an
+unhelpful zero-score error to the user.
 """
 
 import json
@@ -197,6 +199,42 @@ def _run_critic_safe(
         return None
 
 
+def _run_local_fallback(code: str, language: str) -> dict:
+    """Produce a useful review without any external LLM dependency."""
+    fallback_reviews = _empty_reviews()
+
+    # Reuse the deterministic analyzers already shipped with ReForge. This is
+    # intentionally conservative: it reports only issues the local tools can
+    # establish without guessing what the code means.
+    fallback_reviews["bug"].extend(ast_quick_check(code, language))
+    fallback_reviews["security"].extend(detect_hardcoded_secrets(code))
+    fallback_reviews["performance"].extend(detect_infinite_loops(code, language))
+
+    validated_reviews = {
+        category: validate(category, fallback_reviews[category])
+        for category in ALL_CATEGORIES
+    }
+    score = calculate_score(validated_reviews)
+
+    has_findings = any(validated_reviews.values())
+    summary = (
+        "Limited local review completed. External AI review was unavailable."
+        if not has_findings
+        else "Local safety checks completed. External AI review was unavailable, so only deterministic findings are shown."
+    )
+
+    logger.warning("Using deterministic local fallback review; score=%d", score)
+
+    return {
+        "success": True,
+        "language": language,
+        "overall_score": score,
+        "summary": summary,
+        "reviews": validated_reviews,
+        "review_mode": "local_fallback",
+    }
+
+
 def _run_agentic(code: str, language: str) -> dict:
     """
     Run the multi-step agentic review pipeline.
@@ -216,8 +254,6 @@ def _run_agentic(code: str, language: str) -> dict:
         relevant_agents = list(ALL_CATEGORIES)
         focus_notes = "Planner unavailable. Perform a broad review."
 
-    # Run network-bound specialist calls concurrently. This is both faster and
-    # considerably less likely to hit the endpoint timeout on production hosts.
     all_findings = _empty_reviews()
     completed_agents = 0
 
@@ -239,8 +275,6 @@ def _run_agentic(code: str, language: str) -> dict:
             if succeeded:
                 completed_agents += 1
 
-    # The critic is useful, but not a hard dependency. If it fails, preserve
-    # the specialist findings and continue to validation + deterministic scoring.
     critic_result = _run_critic_safe(all_findings, language)
 
     if critic_result is not None:
@@ -270,10 +304,10 @@ def _run_agentic(code: str, language: str) -> dict:
         score,
     )
 
-    # If every external LLM call failed, keep the API honest rather than
-    # presenting a fake successful 100 score.
+    # If every external LLM call failed, switch to the deterministic local
+    # fallback rather than returning a zero-score API failure.
     if completed_agents == 0 and critic_result is None:
-        raise RuntimeError("No review agent completed successfully")
+        return _run_local_fallback(code, language)
 
     return {
         "success": True,
@@ -297,9 +331,6 @@ def _run_agentic_with_timeout(code: str, language: str, timeout: float):
     try:
         return future.result(timeout=timeout)
     finally:
-        # Do not block the request thread waiting for an already-running LLM
-        # request after the deadline. Python cannot forcibly kill the worker,
-        # but the API request itself can return the timeout envelope promptly.
         executor.shutdown(wait=False, cancel_futures=True)
 
 
@@ -321,22 +352,10 @@ def review(code: str, language: str):
         )
     except TimeoutError:
         logger.warning(
-            "Agentic pipeline timed out after %ss",
+            "Agentic pipeline timed out after %ss; using local fallback",
             AGENT_TIMEOUT_SECONDS
         )
-        return {
-            "success": False,
-            "language": language,
-            "overall_score": 0,
-            "summary": "Review timed out. Please try again.",
-            "reviews": _empty_reviews()
-        }
+        return _run_local_fallback(code, language)
     except Exception as exc:
-        logger.exception("Agentic pipeline failed: %s", exc)
-        return {
-            "success": False,
-            "language": language,
-            "overall_score": 0,
-            "summary": "Review failed. Please try again.",
-            "reviews": _empty_reviews()
-        }
+        logger.exception("Agentic pipeline failed: %s; using local fallback", exc)
+        return _run_local_fallback(code, language)

@@ -6,14 +6,9 @@ __pycache__/
 # Environment
 .env
 
-# Node
+# Node / generated frontend output
 node_modules/
 dist/
-.output/
-
-# Vite cache
-.tanstack/
-.vinxi/
 
 # IDE
 .vscode/

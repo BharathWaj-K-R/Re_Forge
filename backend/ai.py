@@ -13,9 +13,9 @@ client = Groq(
     api_key=os.getenv("GROQ_API_KEY")
 )
 
-# Prefer current production models that support the structured JSON output used
-# by ReForge. The runtime Models API decides which of these are actually
-# available to the current API key/project.
+# Current Groq text models known to support the JSON-object mode used by
+# ReForge. The Models API is still consulted at runtime so the app can adapt to
+# project-level model permissions and future model changes.
 PREFERRED_MODELS = (
     "openai/gpt-oss-20b",
     "openai/gpt-oss-120b",
@@ -59,7 +59,7 @@ def _discover_models(force_refresh: bool = False) -> list[str]:
 
 
 def _candidate_models(configured_model: str) -> list[str]:
-    """Build a safe ordered list of models to try."""
+    """Build a safe ordered list of ReForge-compatible text models."""
     discovered = _discover_models()
     discovered_set = set(discovered)
     candidates: list[str] = []
@@ -68,27 +68,26 @@ def _candidate_models(configured_model: str) -> list[str]:
         if model and model not in candidates:
             candidates.append(model)
 
-    # Respect an explicitly configured model if the account can see it.
+    # Respect an explicitly configured model when the account can see it.
     if configured_model in discovered_set:
         add(configured_model)
 
-    # Current, production-oriented models first.
+    # Only select models that are known to be suitable for ReForge's text + JSON
+    # chat workload. Never blindly select arbitrary catalog entries such as
+    # audio or guard models.
     for model in PREFERRED_MODELS:
         if model in discovered_set:
             add(model)
 
-    # Give any other discovered model a chance instead of hard-coding a model
-    # that may disappear in the future.
-    for model in discovered:
-        add(model)
-
-    # When the Models API cannot be queried, retain sensible documented names
-    # as a last resort. The pipeline's local fallback still protects /review.
+    # If the model listing is unavailable, retain the current configured model
+    # and documented production candidates as a last resort. The review
+    # pipeline has its deterministic local fallback for complete AI failure.
     if not candidates:
         add(configured_model)
         for model in PREFERRED_MODELS:
             add(model)
 
+    logger.info("Groq model candidates: %s", candidates)
     return candidates
 
 
@@ -134,11 +133,11 @@ def call_llm(
     """
     Generic synchronous LLM call via Groq.
 
-    ReForge first tries the configured model when it is visible to the current
-    API key. If that model is unavailable, it discovers accessible models and
-    retries with a supported production model. Non-model errors are propagated
-    normally so rate limits, authentication errors, and malformed requests are
-    not hidden.
+    The configured model is used when it is actually exposed by the current
+    Groq key. Otherwise ReForge discovers the accessible catalog and tries the
+    current compatible production models. Model-not-found errors are retried;
+    unrelated API errors are propagated so they can be handled by the review
+    pipeline's existing fallback path.
     """
 
     configured_model = model or os.getenv("GROQ_MODEL", "openai/gpt-oss-20b")
@@ -166,15 +165,16 @@ def call_llm(
                 raise
 
             last_model_error = exc
-            logger.warning("Groq model '%s' unavailable; trying next candidate.", candidate)
-            # Refresh after a model-not-found response in case the model list
-            # changed or the project permissions were updated.
+            logger.warning(
+                "Groq model '%s' unavailable; trying next compatible candidate.",
+                candidate,
+            )
             _discover_models(force_refresh=True)
 
     if last_model_error is not None:
         raise RuntimeError(
-            "No accessible Groq chat model is available for this API key/project. "
-            "Check Groq model permissions or configure GROQ_MODEL to an accessible model."
+            "No accessible Groq text model is available for this API key/project. "
+            "Check the Groq project's model permissions or GROQ_MODEL setting."
         ) from last_model_error
 
     raise RuntimeError("No Groq model candidate is available")

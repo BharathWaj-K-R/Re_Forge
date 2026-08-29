@@ -155,13 +155,13 @@ def _run_specialist_safe(
     code: str,
     language: str,
     focus_notes: str,
-) -> tuple[str, list[dict]]:
+) -> tuple[str, list[dict], bool]:
     """Run one specialist without allowing its failure to abort the batch."""
     try:
-        return agent, _run_specialist(agent, code, language, focus_notes)
+        return agent, _run_specialist(agent, code, language, focus_notes), True
     except Exception as exc:
         logger.exception("Specialist agent %s failed: %s", agent, exc)
-        return agent, []
+        return agent, [], False
 
 
 def _run_critic(
@@ -234,9 +234,9 @@ def _run_agentic(code: str, language: str) -> dict:
         }
 
         for future in as_completed(futures):
-            agent, findings = future.result()
+            agent, findings, succeeded = future.result()
             all_findings[agent] = findings
-            if findings or agent in relevant_agents:
+            if succeeded:
                 completed_agents += 1
 
     # The critic is useful, but not a hard dependency. If it fails, preserve

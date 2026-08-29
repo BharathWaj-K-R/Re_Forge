@@ -275,6 +275,14 @@ def _run_agentic(code: str, language: str) -> dict:
             if succeeded:
                 completed_agents += 1
 
+    # If every specialist failed, use deterministic local analysis regardless
+    # of whether the critic happens to return something for empty findings.
+    if completed_agents == 0:
+        logger.warning("No specialist completed successfully; using local fallback")
+        return _run_local_fallback(code, language)
+
+    # The critic is useful, but not a hard dependency. If it fails, preserve
+    # the successful specialist findings and continue to validation + scoring.
     critic_result = _run_critic_safe(all_findings, language)
 
     if critic_result is not None:
@@ -303,11 +311,6 @@ def _run_agentic(code: str, language: str) -> dict:
         critic_result is not None,
         score,
     )
-
-    # If every external LLM call failed, switch to the deterministic local
-    # fallback rather than returning a zero-score API failure.
-    if completed_agents == 0 and critic_result is None:
-        return _run_local_fallback(code, language)
 
     return {
         "success": True,
@@ -339,7 +342,7 @@ def review(code: str, language: str):
     Public entry point called by routes.py.
 
     Runs the agentic pipeline with a timeout guard and always converts failures
-    into the existing stable response envelope instead of leaking exceptions.
+    into a useful stable response envelope instead of leaking exceptions.
     """
 
     logger.info("Review request for language=%s", language)

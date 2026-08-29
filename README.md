@@ -147,7 +147,6 @@ The score is computed deterministically — the LLM never assigns scores.
 
 | Severity | Deduction |
 |---|---|
-|---|---|
 | Critical | -30 |
 | High | -20 |
 | Medium | -10 |

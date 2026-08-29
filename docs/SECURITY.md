@@ -4,130 +4,75 @@
 
 | Category | Status | Severity |
 |---|---|---|
-| Authentication | JWT + verified email for saved user flows | MEDIUM |
+| Authentication | JWT bearer authentication | MEDIUM |
 | Rate Limiting | Not implemented | HIGH |
-| CORS | Configured with allow-list | LOW risk |
-| Input Validation | Pydantic schema validation | MEDIUM (no size limits) |
-| Secrets Management | Env vars, gitignored | LOW risk |
-| XSS | Mitigated with explicit HTML escaping in static render helpers | LOW risk |
-| CSRF | Not applicable (no cookie auth) | N/A |
+| CORS | Explicit origin allow-list | LOW risk |
+| Input Validation | Pydantic request schema, but no code-size limit | MEDIUM |
+| Secrets Management | Environment variables and gitignored `.env` | LOW risk |
+| XSS | Backend-provided finding text is escaped before HTML insertion | LOW risk |
+| CSRF | Not applicable to bearer-token authentication | N/A |
 | SQL Injection | SQLAlchemy ORM queries | LOW risk |
-| Dependency Vulnerabilities | No known CVEs at time of audit | LOW risk |
-
----
 
 ## Current Security Posture
 
-### What's Protected
+### Protected
 
-- **CORS**: Only explicitly allowed origins can access the API
-- **Input validation**: Pydantic rejects malformed requests (422)
-- **Secrets**: API keys stored in env vars, never committed to git
-- **XSS**: Static rendering helpers escape backend-provided finding content before injecting HTML
-- **JSON parsing**: LLM output is validated and normalized before use
+- **CORS**: Requests are restricted to configured origins.
+- **Input shape validation**: FastAPI/Pydantic validates required request fields.
+- **Secrets**: API keys and database credentials are expected through environment variables.
+- **XSS**: Frontend rendering escapes backend-provided finding content before inserting HTML.
+- **LLM output handling**: Pipeline JSON is parsed and finding fields are normalized before rendering and scoring.
+- **Authentication**: Saved review history and account operations require a valid JWT.
 
-### What's Not Protected
+### Known Limitations
 
-#### 1. Public Review and Test Endpoints (MEDIUM)
+#### 1. No rate limiting
 
-Anonymous users can submit code to `/review`, and `/test-ai` calls the LLM directly. These are useful for demos, but they can consume Groq API credits.
+Anonymous clients can submit unlimited `/review` requests, and `/test-ai` can call Groq directly. This can consume API credits or degrade service availability.
 
-**Recommendation:** Add rate limiting and consider protecting `/test-ai` in production.
+**Recommendation:** Add application or reverse-proxy rate limiting before exposing the service to untrusted high-volume traffic.
 
-#### 2. No Rate Limiting (HIGH)
+#### 2. No request size limit
 
-A single client can send unlimited requests. An attacker could:
-- Exhaust Groq API credits
-- Cause service degradation for other users
+The `code` field currently has no explicit maximum length. Very large requests may increase memory use, token usage, latency, and Groq cost.
 
-**Recommendation:** Add `slowapi` or a reverse-proxy rate limit.
+**Recommendation:** Add a reasonable Pydantic `max_length` to the request fields after confirming an appropriate limit for the project.
 
-#### 3. No Input Size Limits (MEDIUM)
+#### 3. Public `/test-ai` endpoint
 
-The `code` field accepts arbitrarily large strings. A malicious client could:
-- Send megabytes of code per request
-- Cause memory pressure or Groq timeout
+`GET /test-ai` makes a direct Groq request without authentication.
 
-**Recommendation:** Add `max_length` to the Pydantic model:
+**Recommendation:** Remove it from production or protect it before broader public use.
 
-```python
-class ReviewRequest(BaseModel):
-    language: str = Field(..., max_length=50)
-    code: str = Field(..., max_length=100_000)
-```
+#### 4. Development JWT fallback
 
-#### 4. Debug Endpoint in Production (MEDIUM)
-
-`GET /test-ai` calls the LLM directly without authentication. Each call costs Groq API credits.
-
-**Recommendation:** Remove or protect behind auth.
-
----
-
-## Threat Model
-
-### Attack Vectors
-
-| Attack | Likelihood | Impact | Mitigation |
-|---|---|---|---|
-| API credit exhaustion | High | High | Add rate limiting |
-| Code injection via LLM | Low | Medium | LLM output is validated, not executed |
-| CORS bypass | Low | Low | Allow-list is explicit, empty strings filtered |
-| Denial of service | Medium | Medium | Add rate limiting + input size limits |
-| Secret leakage | Low | High | Env vars only, gitignored |
-| Supply chain attack | Low | Medium | Frontend has no runtime npm dependencies |
-
-### What Cannot Happen
-
-- **No file system access** from user input → No path traversal
-- **No cookie-based auth** → No CSRF
-- **Escaped static rendering** → Reduced stored/reflected XSS risk
-- **No user-controlled URLs** → No SSRF
-
----
+The backend contains a development fallback JWT secret in configuration. Production deployments must override `JWT_SECRET` with a strong secret stored in the Render environment.
 
 ## CORS Configuration
 
-The backend CORS middleware allows requests only from:
+The backend permits these development origins and the configured deployed frontend origin:
 
 ```python
 origins = [
-    "http://localhost:5173",              # Local dev
-    "http://localhost:3000",              # Legacy dev
-    os.getenv("NEW_FRONTEND_URL", ""),    # Configurable deployed frontend
+    "http://localhost:5173",
+    "http://localhost:3000",
+    *_extra_origins,
 ]
 ```
 
-Empty strings are filtered out (`if o`). This prevents accidental wildcard-like behavior from unset env vars.
-
----
+`NEW_FRONTEND_URL` can contain one or more comma-separated origins. Empty values are ignored.
 
 ## Dependency Security
 
-### Backend
+Backend dependencies are pinned to specific versions in `requirements.txt`.
 
-All dependencies pinned to specific versions in `requirements.txt`. No unpinned (`>=`) dependencies.
+The frontend has no runtime npm dependencies. Its optional npm script is only a static-file copy step for compatibility with an existing Render build configuration.
 
-### Frontend
+## Security Principles
 
-The frontend has no runtime npm dependencies. The optional `npm run build` script only copies static files into `dist/` for Render compatibility.
-
----
-
-## Reporting Vulnerabilities
-
-If you discover a security vulnerability, please email the maintainer directly rather than opening a public issue.
-
----
-
-## Security Roadmap
-
-| Priority | Item | Status |
-|---|---|---|
-| P0 | Add rate limiting | Planned |
-| P0 | Add API authentication | Planned |
-| P1 | Add input size limits | Planned |
-| P1 | Remove /test-ai endpoint | Planned |
-| P2 | Add request logging with audit trail | Planned |
-| P2 | Add Content-Security-Policy headers | Planned |
-| P3 | Add HSTS header | Planned |
+1. Do not commit `.env` or real API keys.
+2. Keep `JWT_SECRET` strong and private in production.
+3. Keep the frontend CORS origin restricted to the deployed frontend.
+4. Do not execute user-submitted code on the server.
+5. Treat LLM findings as untrusted data and validate/escape them before use.
+6. Add rate limiting and request-size limits before high-volume public use.

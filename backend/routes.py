@@ -2,10 +2,10 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from backend.review_pipeline.pipeline import review
-from backend.auth import get_current_user
+from backend.auth import get_current_user, require_user
 from backend.database import get_db
 from backend.models import User, Review
+from backend.review_pipeline.pipeline import review
 
 router = APIRouter()
 
@@ -17,39 +17,27 @@ class ReviewRequest(BaseModel):
 
 @router.get("/")
 def home():
-    return {
-        "success": True,
-        "message": "Welcome to ReForge API"
-    }
+    return {"success": True, "message": "Welcome to ReForge API"}
 
 
 @router.get("/health")
 def health():
-    return {
-        "status": "healthy",
-        "service": "ReForge API",
-        "version": "1.0.0"
-    }
+    return {"status": "healthy", "service": "ReForge API", "version": "1.0.0"}
 
 
 @router.get("/test-ai")
 def test_ai():
     from backend.ai import call_llm
+
     try:
         result = call_llm(
             system_prompt="You are a test assistant.",
             user_prompt="Say hello in one word.",
-            response_format="text"
+            response_format="text",
         )
-        return {
-            "success": True,
-            "result": result
-        }
-    except Exception as e:
-        return {
-            "success": False,
-            "error": str(e)
-        }
+        return {"success": True, "result": result}
+    except Exception as error:
+        return {"success": False, "error": str(error)}
 
 
 @router.post("/review")
@@ -58,15 +46,10 @@ def review_endpoint(
     current_user: User | None = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    result = review(code=request.code, language=request.language)
 
-    result = review(
-        code=request.code,
-        language=request.language
-    )
-
-    # Save to history if user is authenticated
     if current_user and result.get("success"):
-        review_record = Review(
+        record = Review(
             user_id=current_user.id,
             language=request.language,
             code=request.code,
@@ -74,23 +57,19 @@ def review_endpoint(
             summary=result.get("summary", ""),
             reviews_data=result.get("reviews", {}),
         )
-        db.add(review_record)
+        db.add(record)
         db.commit()
-        db.refresh(review_record)
-        result["review_id"] = review_record.id
+        db.refresh(record)
+        result["review_id"] = record.id
 
     return result
 
 
 @router.get("/history")
 def get_history(
-    current_user: User = Depends(get_current_user),
+    user: User = Depends(require_user),
     db: Session = Depends(get_db),
 ):
-    """Return the authenticated user's review history."""
-    from backend.auth import require_user
-    user = require_user(current_user)
-
     reviews = (
         db.query(Review)
         .filter(Review.user_id == user.id)
@@ -103,13 +82,15 @@ def get_history(
         "count": len(reviews),
         "reviews": [
             {
-                "id": r.id,
-                "language": r.language,
-                "overall_score": r.overall_score,
-                "summary": r.summary,
-                "created_at": r.created_at.isoformat() if r.created_at else None,
+                "id": item.id,
+                "language": item.language,
+                "overall_score": item.overall_score,
+                "summary": item.summary,
+                "created_at": item.created_at.isoformat()
+                if item.created_at
+                else None,
             }
-            for r in reviews
+            for item in reviews
         ],
     }
 
@@ -117,69 +98,52 @@ def get_history(
 @router.get("/history/{review_id}")
 def get_review_detail(
     review_id: int,
-    current_user: User = Depends(get_current_user),
+    user: User = Depends(require_user),
     db: Session = Depends(get_db),
 ):
-    """Return full detail of a single review."""
-    from backend.auth import require_user
-    user = require_user(current_user)
-
-    review_record = (
+    record = (
         db.query(Review)
         .filter(Review.id == review_id, Review.user_id == user.id)
         .first()
     )
 
-    if not review_record:
+    if not record:
         return {"success": False, "message": "Review not found"}
 
     return {
         "success": True,
         "review": {
-            "id": review_record.id,
-            "language": review_record.language,
-            "code": review_record.code,
-            "overall_score": review_record.overall_score,
-            "summary": review_record.summary,
-            "reviews": review_record.reviews_data,
-            "created_at": review_record.created_at.isoformat() if review_record.created_at else None,
+            "id": record.id,
+            "language": record.language,
+            "code": record.code,
+            "overall_score": record.overall_score,
+            "summary": record.summary,
+            "reviews": record.reviews_data,
+            "created_at": record.created_at.isoformat()
+            if record.created_at
+            else None,
         },
     }
 
 
 @router.delete("/history")
 def clear_history(
-    current_user: User = Depends(get_current_user),
+    user: User = Depends(require_user),
     db: Session = Depends(get_db),
 ):
-    """Delete all review history for the authenticated user."""
-    from backend.auth import require_user
-    user = require_user(current_user)
-
     deleted = db.query(Review).filter(Review.user_id == user.id).delete()
     db.commit()
 
-    return {
-        "success": True,
-        "message": f"Deleted {deleted} review(s)",
-    }
+    return {"success": True, "message": f"Deleted {deleted} review(s)"}
 
 
 @router.delete("/account")
 def delete_account(
-    current_user: User = Depends(get_current_user),
+    user: User = Depends(require_user),
     db: Session = Depends(get_db),
 ):
-    """Delete the authenticated user's account and all their data."""
-    from backend.auth import require_user
-    user = require_user(current_user)
-
-    # Delete all reviews first (cascade should handle this, but be explicit)
     db.query(Review).filter(Review.user_id == user.id).delete()
     db.delete(user)
     db.commit()
 
-    return {
-        "success": True,
-        "message": "Account deleted successfully",
-    }
+    return {"success": True, "message": "Account deleted successfully"}

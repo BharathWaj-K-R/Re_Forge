@@ -1,0 +1,11 @@
+{
+  "name": "reforge-static-frontend",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Static HTML, CSS, and JavaScript frontend for ReForge.",
+  "scripts": {
+    "build": "rm -rf dist && mkdir -p dist && cp -R index.html css js assets dist/",
+    "dev": "python3 -m http.server 5173",
+    "preview": "python3 -m http.server 5173 --directory dist"
+  }
+}
